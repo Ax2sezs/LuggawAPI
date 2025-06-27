@@ -12,6 +12,7 @@
         public virtual User User { get; set; }
 
         public Rewards Reward { get; set; }
+        public RewardType RewardType { get; set; }
         
     }
 }

@@ -31,15 +31,74 @@ public class RewardService : IRewardService
     //        .Where(r => r.IsActive&&!redeemedRewardIds.Contains(r.RewardId))
     //        .ToListAsync();
     //}
+    //public async Task<IEnumerable<Rewards>> GetAvailableRewardsAsync(Guid userId)
+    //{
+    //    var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+    //    TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+
+    //    return await _context.Rewards
+    //    .Where(r => r.IsActive && r.EndDate >= now)
+    //        .ToListAsync();
+    //}
+
     public async Task<IEnumerable<Rewards>> GetAvailableRewardsAsync(Guid userId)
     {
         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
-        TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+            TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
 
-        return await _context.Rewards
-        .Where(r => r.IsActive && r.EndDate >= now)
+        // 1. ดึงวันเกิดของผู้ใช้
+        var user = await _context.Users
+            .Where(u => u.UserId == userId)
+            .Select(u => new { u.BirthDate })
+            .FirstOrDefaultAsync();
+
+        if (user == null)
+            throw new Exception("User not found");
+
+        if (!user.BirthDate.HasValue)
+            throw new Exception("User does not have a birthdate set.");
+
+        var birthMonth = user.BirthDate.Value.Month;
+        var currentMonth = now.Month;
+
+        // 2. ดึง reward ทั้งหมดที่เปิดใช้งานและยังไม่หมดอายุ
+        var rewards = await _context.Rewards
+            .Where(r => r.IsActive && r.EndDate >= now)
             .ToListAsync();
+
+        // 3. ดึง reward ที่ user คนนี้เคยแลก
+        var redeemedRewardIds = await _context.RedeemedRewards
+            .Where(rr => rr.UserId == userId)
+            .Select(rr => rr.RewardId)
+            .ToListAsync();
+
+        // 4. ดึง reward ที่ถูกแลกโดยใครก็ได้ (สำหรับ exclusive)
+        var allRedeemedExclusiveRewardIds = await _context.RedeemedRewards
+            .Where(rr => rewards.Select(r => r.RewardId).Contains(rr.RewardId))
+            .Select(rr => rr.RewardId)
+            .Distinct()
+            .ToListAsync();
+
+        // 5. กรองผลลัพธ์ตามประเภท
+        var filtered = rewards
+            .Where(r =>
+                r.RewardType == RewardType.General || // ทั่วไป แสดงเสมอ
+                (
+                    r.RewardType == RewardType.UniqueUse &&
+                    birthMonth == currentMonth &&
+                    !redeemedRewardIds.Contains(r.RewardId)
+                ) ||
+                (
+                    r.RewardType == RewardType.Exclusive &&
+                    !allRedeemedExclusiveRewardIds.Contains(r.RewardId)
+                )
+            )
+            .ToList();
+
+        return filtered;
     }
+
+
 
 
 

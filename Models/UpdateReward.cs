@@ -10,6 +10,7 @@
         public string? CouponCode { get; set; }
         public DateTime? UpdateAt { get; set; }
         public int? CategoryId { get; set; }
+        public RewardType? RewardType { get; set; }
 
     }
 }

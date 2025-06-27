@@ -42,14 +42,14 @@ namespace backend.Services
             _dbContext = dbContext;
             _httpContextAccessor = httpContextAccessor;
         }
-        public string GenerateJwtToken(Guid userId, string displayName)
+        public string GenerateJwtToken(Guid userId, string lineUserId)
         {
             var claims = new[]
             {
          new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
-        new Claim(JwtRegisteredClaimNames.UniqueName, displayName),
-        new Claim(ClaimTypes.NameIdentifier, userId.ToString()), // ✅ เปลี่ยนจาก lineUserId
-        new Claim(ClaimTypes.Name, displayName)
+        new Claim(JwtRegisteredClaimNames.UniqueName, lineUserId),
+        new Claim(ClaimTypes.NameIdentifier, userId.ToString()), 
+        new Claim(ClaimTypes.Name, lineUserId)
 
         };
 

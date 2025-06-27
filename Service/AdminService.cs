@@ -8,6 +8,10 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using System.Text;
 
 
 namespace backend.Services
@@ -17,12 +21,15 @@ namespace backend.Services
         private readonly AppDbContext _context;
         private readonly IWebHostEnvironment _environment;
         private readonly FileSettings _fileSettings;
+        private readonly LineLoginService _lineLoginService; // ✅ ใช้ generate token
 
-        public AdminService(AppDbContext context,IWebHostEnvironment environment, IOptions<FileSettings> fileSettings)
+
+        public AdminService(AppDbContext context, IWebHostEnvironment environment, IOptions<FileSettings> fileSettings, LineLoginService lineLoginService)
         {
             _context = context;
             _environment = environment;
             _fileSettings = fileSettings.Value;
+            _lineLoginService = lineLoginService;
         }
         private async Task<List<string>> SaveImages(List<IFormFile> images)
         {
@@ -197,7 +204,8 @@ namespace backend.Services
                     EndDate = request.EndDate,
                     CouponCode = rewardCode,  // ใช้โค้ดที่ generate ใหม่
                     CategoryId = request.CategoryId,
-                    IsActive = request.IsActive
+                    IsActive = request.IsActive,
+                    RewardType = request.RewardType
                 };
 
                 if (request.Image != null && request.Image.Length > 0)
@@ -256,6 +264,8 @@ namespace backend.Services
                 reward.CouponCode = updateDto.CouponCode;
             if (updateDto.CategoryId.HasValue)
                 reward.CategoryId = updateDto.CategoryId.Value;
+            if (updateDto.RewardType.HasValue)
+                reward.RewardType = updateDto.RewardType.Value;
 
 
             reward.UpdateAt = now;
@@ -731,6 +741,38 @@ namespace backend.Services
             await _context.SaveChangesAsync();
 
             return category;
+        }
+
+
+
+        // LoginAsync
+        public async Task<AdminLoginResponse> LoginAsync(AdminLoginRequest request)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.LineUserId == request.Username && u.IsAdmin == true);
+            Console.WriteLine(user == null ? "User not found" : "User found: " + user.LineUserId);
+            string inputPassword = "]^ddUvcvf,bogmr:jk";
+            string hash = PasswordHasher.HashPassword(inputPassword);
+            Console.WriteLine($"Hash ที่ได้จาก \"{inputPassword}\": {hash}");
+
+            if (user == null)
+                throw new UnauthorizedAccessException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+
+            bool isValid = PasswordHasher.VerifyPassword(request.Password?.Trim() ?? "", user.PhoneNumber);
+            Console.WriteLine("Password valid? " + isValid);
+
+            if (!isValid)
+                throw new UnauthorizedAccessException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+
+
+            var token = _lineLoginService.GenerateJwtToken(user.UserId, user.LineUserId);
+
+            return new AdminLoginResponse
+            {
+                Token = token,
+                UserId = user.UserId,
+                Username = user.LineUserId,
+                FullName = user.DisplayName
+            };
         }
 
     }

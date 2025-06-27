@@ -55,6 +55,8 @@ namespace backend.Service.Interfaces
         Task<Category> CreateCategoryAsync(CreateCategoryRequest request);
         Task<List<Category>> GetAllCategoriesAsync();
         Task<string> GenerateUniqueRewardCodeAsync(string prefix);
+        Task<AdminLoginResponse> LoginAsync(AdminLoginRequest request);
+
 
 
 

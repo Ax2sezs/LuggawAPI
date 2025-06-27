@@ -12,6 +12,7 @@ namespace backend.Models
         public IFormFile? Image { get; set; }
         public bool IsActive { get; set; }
         public int CategoryId { get; set; }
+        public RewardType RewardType { get; set; }
 
     }
 }

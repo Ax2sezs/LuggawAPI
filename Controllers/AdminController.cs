@@ -1,5 +1,6 @@
 ﻿using backend.Models;
 using backend.Service.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -18,9 +19,26 @@ namespace backend.Controllers
             _adminService = adminService;
         }
 
- 
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
+        {
+            try
+            {
+                var response = await _adminService.LoginAsync(request);
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch
+            {
+                return StatusCode(500, new { message = "เกิดข้อผิดพลาดในการเข้าสู่ระบบ" });
+            }
+        }
 
-            [HttpGet("summary")]
+        [Authorize]
+        [HttpGet("summary")]
             public async Task<IActionResult> GetSummary()
             {
                 var result = await _adminService.GetDashboardSummaryAsync();
@@ -44,6 +62,7 @@ namespace backend.Controllers
             return Ok(users);
         }
 
+        [Authorize]
         [HttpGet("get-all-transaction")]
         public async Task<IActionResult> GetAllTransactions(
      int page = 1,
@@ -64,7 +83,7 @@ namespace backend.Controllers
         }
 
 
-
+        [Authorize]
         [HttpPost("toggle-user-status")]
         public async Task<IActionResult> ToggleUserStatus([FromBody] ToggleRequest request)
         {
@@ -79,6 +98,7 @@ namespace backend.Controllers
             }
         }
 
+        [Authorize]
         [HttpPost("add-cate")]
         public async Task<IActionResult> CreateCategory([FromBody] CreateCategoryRequest request)
         {
@@ -92,12 +112,16 @@ namespace backend.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [Authorize]
         [HttpGet("get-category")]
         public async Task<IActionResult> GetAll()
         {
             var categories = await _adminService.GetAllCategoriesAsync();
             return Ok(categories);
         }
+
+        [Authorize]
         [HttpGet("generate-code")]
         public async Task<IActionResult> GenerateCode([FromQuery] string prefix)
         {
@@ -114,6 +138,8 @@ namespace backend.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
+        [Authorize]
         [HttpPost("create")]
         public async Task<IActionResult> CreateReward([FromForm] CreateRewardRequest request)
         {
@@ -131,6 +157,7 @@ namespace backend.Controllers
             }
         }
 
+        [Authorize]
         [HttpPut("update-reward/{rewardId}")]
         public async Task<IActionResult> UpdateReward(Guid rewardId, [FromForm] UpdateReward updateDto, IFormFile? imageFile)
         {
@@ -140,6 +167,8 @@ namespace backend.Controllers
             return Ok(); // หรือ Ok() ถ้าอยากส่งข้อมูลกลับ
         }
 
+
+        [Authorize]
         [HttpPatch("rewards/{rewardId}/toggle-active")]
         public async Task<IActionResult> ToggleRewardStatus(Guid rewardId)
         {
@@ -152,7 +181,7 @@ namespace backend.Controllers
 
 
 
-
+        [Authorize]
         [HttpGet("rewards")]
         public async Task<IActionResult> GetAllRewards(
      int page = 1,
@@ -170,6 +199,8 @@ namespace backend.Controllers
             );
             return Ok(result);
         }
+
+        [Authorize]
         [HttpGet("reward/{rewardId}")]
         public async Task<IActionResult> GetRewardById(Guid rewardId)
         {
@@ -179,6 +210,8 @@ namespace backend.Controllers
 
             return Ok(reward);
         }
+
+        [Authorize]
         [HttpPost("create-feed")]
         public async Task<IActionResult> CreateFeed([FromForm] CreateFeedRequest request)
         {
@@ -186,6 +219,8 @@ namespace backend.Controllers
             return Ok(feed);
         }
 
+
+        [Authorize]
         [HttpPut("update-feed/{id}")]
         public async Task<IActionResult> UpdateFeed(Guid id, [FromForm] UpdateFeedRequest request)
         {
@@ -193,6 +228,8 @@ namespace backend.Controllers
             if (updatedFeed == null) return NotFound();
             return Ok(updatedFeed);
         }
+
+        [Authorize]
         [HttpPatch("{feedId}/toggle-active")]
         public async Task<IActionResult> ToggleFeedActive(Guid feedId)
         {
@@ -202,6 +239,7 @@ namespace backend.Controllers
             return Ok(new { isActive = newStatus });
         }
 
+        [Authorize]
         [HttpDelete("images/{imageId}")]
         public async Task<IActionResult> DeleteImage(int imageId)
         {
@@ -212,7 +250,7 @@ namespace backend.Controllers
             return Ok();
         }
 
-
+        [Authorize]
         [HttpGet("get-all-feed")]
         public async Task<IActionResult> GetFeeds(
     [FromQuery] int pageNumber = 1,
@@ -233,7 +271,7 @@ namespace backend.Controllers
             return Ok(pagedFeeds);
         }
 
-
+        [Authorize]
         [HttpGet("get-feed-by/{id}")]
         public async Task<IActionResult> GetFeedById(Guid id)
         {

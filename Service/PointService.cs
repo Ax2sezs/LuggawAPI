@@ -6,10 +6,13 @@ using backend.Models;
 public class PointService : IPointService
 {
     private readonly AppDbContext _context;
+    private readonly IPointSyncToPosService _posSyncService;
 
-    public PointService(AppDbContext context)
+
+    public PointService(AppDbContext context, IPointSyncToPosService posSyncService)
     {
         _context = context;
+        _posSyncService = posSyncService;
     }
 
     public async Task<int> GetTotalPointsAsync(Guid userId)
@@ -106,6 +109,21 @@ public class PointService : IPointService
         _context.Users.Update(user);
 
         await _context.SaveChangesAsync();
+        try
+        {
+            var success = await _posSyncService.SyncEarnPointToPosAsync(phoneNumber, points);
+            if (!success)
+            {
+                Console.WriteLine("⚠️ POS Sync Failed");
+                // คุณจะเลือก throw หรือ log เฉยๆ ก็ได้
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine("❌ POS Sync Exception: " + ex.Message);
+            // ถ้าคุณไม่อยากให้ POS พังแล้วทำให้ Web Fail → จับแยกไว้เลย
+        }
+
     }
 
 }

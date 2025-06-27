@@ -1,4 +1,5 @@
 ﻿using backend.Models;
+using backend.Service;
 using backend.Service.Interfaces;
 using backend.Services;
 using LineLoginBackend.Configurations;
@@ -26,6 +27,9 @@ builder.Services.AddScoped<IRewardService, RewardService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IFeedService, FeedService>();
 builder.Services.AddScoped<IPosService, PosService>();
+builder.Services.AddScoped<LineLoginService>();
+builder.Services.AddScoped<IPointSyncToPosService, PointSyncToPosService>();
+
 
 
 builder.Services.AddSignalR();

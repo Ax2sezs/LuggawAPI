@@ -14,5 +14,6 @@
         public string CouponCode { get; set; }
         public bool IsUsed { get; set; }
         public DateTime? UsedDate { get; set; }
+        public RewardType RewardType { get; set; }
     }
 }

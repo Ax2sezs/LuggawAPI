@@ -11,10 +11,12 @@ using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
 public class RedeemService : IRedeemService
 {
     private readonly AppDbContext _context;
+    private readonly IPointSyncToPosService _posSyncService;
 
-    public RedeemService(AppDbContext context)
+    public RedeemService(AppDbContext context, IPointSyncToPosService posSyncService)
     {
         _context = context;
+        _posSyncService = posSyncService;
     }
 
     //public async Task RedeemRewardAsync(Guid userId, Guid rewardId)
@@ -132,6 +134,8 @@ public class RedeemService : IRedeemService
 
         _context.Users.Update(user);
         await _context.SaveChangesAsync();
+        await _posSyncService.SyncRedeemPointToPosAsync(user.PhoneNumber, reward.PointsRequired);
+
     }
 
     private string GenerateCouponCode()
@@ -165,24 +169,52 @@ public class RedeemService : IRedeemService
     //        .ToListAsync();
     //}
     public async Task<PagedResult<UserRedeemed>> GetMyRedeemedAsync(
-    Guid userId, string status = "all", int page = 1, int pageSize = 10)
+     Guid userId, string status = "all", int page = 1, int pageSize = 10)
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
 
+        // ดึงวันเกิด user เพื่อตรวจเดือนเกิด (ใช้กับ Birthday Reward)
+        var user = await _context.Users
+            .Where(u => u.UserId == userId)
+            .Select(u => new { u.BirthDate })
+            .FirstOrDefaultAsync();
+
+        int birthMonth = user?.BirthDate?.Month ?? -1;
+
+        // Base query
         var query = _context.RedeemedRewards
             .Where(r => r.UserId == userId)
             .Include(r => r.Reward)
             .AsQueryable();
 
+        // Apply filter ตาม status
         query = status.ToLower() switch
         {
             "used" => query.Where(r => r.IsUsed),
-            "unused" => query.Where(r => !r.IsUsed && r.Reward.EndDate >= now),
-            "expired" => query.Where(r => !r.IsUsed && r.Reward.EndDate < now),
+
+            "unused" => query.Where(r =>
+                !r.IsUsed &&
+                (
+                    // Reward ปกติ: ดูจาก EndDate
+                    (r.Reward.RewardType != RewardType.UniqueUse && r.Reward.EndDate >= now) ||
+                    // Birthday reward: เดือนปัจจุบัน == เดือนเกิด
+                    (r.Reward.RewardType == RewardType.UniqueUse && birthMonth == now.Month)
+                )),
+
+            "expired" => query.Where(r =>
+                !r.IsUsed &&
+                (
+                    // Reward ปกติ: หมดอายุตาม EndDate
+                    (r.Reward.RewardType != RewardType.UniqueUse && r.Reward.EndDate < now) ||
+                    // Birthday reward: เดือนปัจจุบัน != เดือนเกิด
+                    (r.Reward.RewardType == RewardType.UniqueUse && birthMonth != now.Month)
+                )),
+
             _ => query
         };
 
+        // ดึงข้อมูลพร้อม Paging
         var totalCount = await query.CountAsync();
         var items = await query
             .OrderByDescending(r => r.RedeemedDate)
@@ -199,9 +231,13 @@ public class RedeemService : IRedeemService
                 ImageUrl = r.Reward.ImageUrl,
                 StartDate = r.Reward.StartDate,
                 EndDate = r.Reward.EndDate,
-                CouponCode = r.CouponCode,
+                CouponCode = (
+                    (r.Reward.RewardType != RewardType.UniqueUse && r.Reward.EndDate < now) ||
+                    (r.Reward.RewardType == RewardType.UniqueUse && birthMonth != now.Month)
+                ) ? null : r.CouponCode,
                 IsUsed = r.IsUsed,
-                UsedDate = r.UsedDate
+                UsedDate = r.UsedDate,
+                RewardType = r.Reward.RewardType
             })
             .ToListAsync();
 
@@ -213,6 +249,8 @@ public class RedeemService : IRedeemService
             PageSize = pageSize
         };
     }
+
+
 
 
 

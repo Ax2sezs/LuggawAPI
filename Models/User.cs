@@ -15,6 +15,8 @@
         public bool IsActive { get; set; }
         public DateTime? LastTransactionDate { get; set; }
         public bool? IsCompleted { get; set; }
+        public string? MemberNumber { get; set; }
+        public bool? IsAdmin { get; set; }
 
         public UserPoints UserPoint { get; set; }
 

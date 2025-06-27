@@ -243,11 +243,17 @@ namespace LineLoginBackend.Controllers
 
                     user.DisplayName = profile.DisplayName;
                     user.PictureUrl = profile.PictureUrl;
+                    if (string.IsNullOrEmpty(user.MemberNumber))
+                    {
+                        var random = new Random();
+                        string memberNumber = string.Concat(Enumerable.Range(0, 16).Select(_ => random.Next(0, 10).ToString()));
+                        user.MemberNumber = memberNumber;
+                    }
                     await _dbContext.SaveChangesAsync();
                 }
 
 
-                var jwt = _lineLoginService.GenerateJwtToken(user.UserId, user.DisplayName);
+                var jwt = _lineLoginService.GenerateJwtToken(user.UserId, user.LineUserId);
 
                 return Ok(new
                 {
