@@ -1,83 +1,114 @@
-﻿using System.Text;
+﻿using backend.Service.Interfaces;
+using LineLoginBackend.Data;
+using Microsoft.EntityFrameworkCore;
+using backend.Models;
 using System.Text.Json;
-using backend.Service.Interfaces;
-
+using Microsoft.Extensions.Options;
+using System.Text;
 namespace backend.Service
 {
     public class PointSyncToPosService : IPointSyncToPosService
     {
-        private readonly HttpClient _httpClient;
 
-        public PointSyncToPosService(HttpClient httpClient)
+        private readonly HttpClient _httpClient;
+        private readonly PosApiSettings _settings;
+
+        public PointSyncToPosService(IHttpClientFactory httpClientFactory, IOptions<PosApiSettings> posApiOptions)
         {
-            _httpClient = httpClient;
+            _httpClient = httpClientFactory.CreateClient("PosApiClient");
+            _settings = posApiOptions.Value;
+            _httpClient.DefaultRequestHeaders.Add("API_KEY", _settings.ApiKey);
         }
 
-        public async Task<bool> SyncEarnPointToPosAsync( string phoneNumber, int points)
+        private string GenerateNumericOrderNo(int length)
+        {
+            var bytes = new byte[length];
+            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
+            rng.GetBytes(bytes);
+
+            var numbers = new StringBuilder(length);
+            foreach (var b in bytes)
+            {
+                numbers.Append((b % 10).ToString());
+            }
+            return numbers.ToString();
+        }
+
+
+        public async Task<bool> SyncEarnPointToPosAsync(string phoneNumber, int points)
         {
             var payload = new
             {
                 mem_number = "",
                 mem_phone = phoneNumber,
-                redeem_order_no = Guid.NewGuid().ToString("N").Substring(0, 18),
-                redeem_point = points // ต้องติดลบ และส่งเป็น number
+                redeem_order_no = GenerateNumericOrderNo(16),
+                redeem_point = points // earn: บวก
             };
 
+            var url = _settings.BaseUrl + _settings.Endpoints.RedeemByApp;
             var json = JsonSerializer.Serialize(payload);
-
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://apimobileuat.mmm2007.net/api/Member/RedeemByApp")
+            var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
-  
 
-            request.Headers.Add("API_KEY", "02F152A1-EEB5-4469-8F8C-C5BEC1A2AF1B");
+            // ใส่ header API_KEY
+            request.Headers.Add("API_KEY", _settings.ApiKey);
 
             try
             {
-                Console.WriteLine("📤 JSON ส่งไป POS:");
+                Console.WriteLine("📤 JSON ส่งไป POS (Earn):");
                 Console.WriteLine(json);
+                Console.WriteLine($"➡️ URL: {url}");
 
                 var response = await _httpClient.SendAsync(request);
                 var content = await response.Content.ReadAsStringAsync();
 
-                Console.WriteLine($"📥 RESPONSE: {(int)response.StatusCode} - {content}");
-
-                return response.IsSuccessStatusCode;
-            }
-            catch (TaskCanceledException ex)
-            {
-                Console.WriteLine("❌ TIMEOUT: " + ex.Message);
-                return false;
+                if (response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine("✅ POS Earn Sync Success: " + content);
+                    return true;
+                }
+                else
+                {
+                    Console.WriteLine("❌ POS Earn Sync Failed: " + content);
+                    return false;
+                }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("❌ ERROR: " + ex.ToString());
+                Console.WriteLine("❗ POS Earn Sync Exception: " + ex.Message);
                 return false;
             }
         }
 
-        public async Task<bool> SyncRedeemPointToPosAsync(string phoneNumber, int points)
+
+        public async Task<bool> SyncRedeemPointToPosAsync(string phoneNumber, double points)
         {
             var payload = new
             {
-                mem_number = "", // ถ้ามี mem_number จริง ควรใส่
+                mem_number = "",
                 mem_phone = phoneNumber,
-                redeem_order_no = Guid.NewGuid().ToString("N").Substring(0, 18),
-                redeem_point = (-1.0 * points).ToString("0.00") // ต้องติดลบตาม POS Spec
+                redeem_order_no = GenerateNumericOrderNo(16),
+                redeem_point = -1.0 * points // Redeem: ติดลบ เช่น -5.0
             };
 
+            var url = _settings.BaseUrl + _settings.Endpoints.RedeemByApp;
             var json = JsonSerializer.Serialize(payload);
-
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://apimobileuat.mmm2007.net/api/Member/RedeemByApp")
+            var request = new HttpRequestMessage(HttpMethod.Post, url)
             {
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
 
-            request.Headers.Add("API_KEY", "02F152A1-EEB5-4469-8F8C-C5BEC1A2AF1B");
+            // ใส่ header API_KEY
+            request.Headers.Add("API_KEY", _settings.ApiKey);
 
             try
             {
+                Console.WriteLine("📤 JSON ส่งไป POS (Redeem):");
+                Console.WriteLine(json);
+                Console.WriteLine($"➡️ URL: {url}");
+
                 var response = await _httpClient.SendAsync(request);
                 var content = await response.Content.ReadAsStringAsync();
 
@@ -99,9 +130,5 @@ namespace backend.Service
             }
         }
 
-
-
-
     }
-
 }

@@ -2,7 +2,7 @@
 {
     public class PointTransactions
     {
-        public List<PointTransaction> Transactions { get; set; } = new();
+        public List<PointTransactionDto> Transactions { get; set; } = new();
         public Guid UserId { get; set; }
         public int TotalPoints { get; set; }
         public int PageNumber { get; set; }

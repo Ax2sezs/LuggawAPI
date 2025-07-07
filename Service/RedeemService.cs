@@ -126,15 +126,24 @@ public class RedeemService : IRedeemService
             RedeemedDate = now,
             IsUsed = false,
             UsedDate = null,
-            CouponCode = couponCode
+            CouponCode = couponCode,
+            RewardType = reward.RewardType,
         };
 
         _context.RedeemedRewards.Add(redeemed);
         user.LastTransactionDate = now;
 
         _context.Users.Update(user);
-        await _context.SaveChangesAsync();
-        await _posSyncService.SyncRedeemPointToPosAsync(user.PhoneNumber, reward.PointsRequired);
+        try
+        {
+            await _context.SaveChangesAsync();
+        }
+        catch (DbUpdateException ex)
+        {
+            var innerMessage = ex.InnerException?.Message ?? ex.Message;
+            throw new Exception("SaveChanges failed: " + innerMessage, ex);
+        }
+        await _posSyncService.SyncRedeemPointToPosAsync(user.PhoneNumber, (double)reward.PointsRequired);
 
     }
 

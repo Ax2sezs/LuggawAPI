@@ -10,11 +10,12 @@ public class AppDbContext : DbContext
     public DbSet<PointTransaction> PointTransactions { get; set; }
     public DbSet<Rewards> Rewards { get; set; }
     public DbSet<RedeemedReward> RedeemedRewards { get; set; }
-    public DbSet<UserLog>UserLogs { get; set; }
-    public DbSet<Feeds>Feeds { get; set; }
+    public DbSet<UserLog> UserLogs { get; set; }
+    public DbSet<Feeds> Feeds { get; set; }
     public DbSet<ImageUrl> ImageUrls { get; set; }
     public DbSet<FeedLike> FeedLikes { get; set; }
-    public DbSet<Category>Category { get; set; }
+    public DbSet<Category> Category { get; set; }
+    public DbSet<User_Admin> User_Admin { get; set; }
 
     //public DbSet<RewardImages> RewardImages { get; set; }
 
@@ -25,6 +26,11 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        modelBuilder.Entity<User_Admin>(entity =>
+   {
+       entity.HasKey(e => e.UserId);
+       // กำหนด property อื่น ๆ ตามต้องการ
+   });
         modelBuilder.Entity<User>()
             .Property(u => u.UserId)
             .HasDefaultValueSql("NEWID()");
@@ -76,8 +82,8 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<UserPoints>()
         .HasKey(up => up.UserPointId);  // สมมติว่าคุณมี property ชื่อ UserPointId เป็น PK
-        // กำหนดความสัมพันธ์ 1 User : 1 UserPoints (ถ้ามี)
-       
+                                        // กำหนดความสัมพันธ์ 1 User : 1 UserPoints (ถ้ามี)
+
 
         modelBuilder.Entity<PointTransaction>()
        .HasKey(pt => pt.TransactionId);   // เพิ่มบรรทัดนี้

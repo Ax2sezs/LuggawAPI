@@ -6,7 +6,9 @@ namespace backend.Service.Interfaces
     {
         Task<int> GetTotalPointsAsync(Guid userId);
         Task EarnPointsAsync(string phoneNumber, int points, string? description);
-        Task<PointTransactions> GetTransactionsByUserIdAsync(Guid userId, int pageNumber, int pageSize);
+        Task<PointTransactions> GetTransactionsByPhoneNumberAsync(string phoneNumber, int pageNumber, int pageSize);
+        Task<string?> GetUserPhoneNumberAsync(Guid userId);
+
 
     }
 }

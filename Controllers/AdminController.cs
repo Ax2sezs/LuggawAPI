@@ -19,23 +19,26 @@ namespace backend.Controllers
             _adminService = adminService;
         }
 
-        [HttpPost("login")]
-        public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
-        {
-            try
-            {
-                var response = await _adminService.LoginAsync(request);
-                return Ok(response);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                return Unauthorized(new { message = ex.Message });
-            }
-            catch
-            {
-                return StatusCode(500, new { message = "เกิดข้อผิดพลาดในการเข้าสู่ระบบ" });
-            }
-        }
+     [HttpPost("login")]
+public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
+{
+    try
+    {
+        var response = await _adminService.LoginAsync(request);
+        return Ok(response);
+    }
+    catch (UnauthorizedAccessException ex)
+    {
+        return Unauthorized(new { message = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        // เพิ่ม log error ที่นี่
+        Console.WriteLine($"Login error: {ex}");
+        return StatusCode(500, new { message = ex.Message, stackTrace = ex.StackTrace });
+    }
+}
+
 
         [Authorize]
         [HttpGet("summary")]

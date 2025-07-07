@@ -18,6 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ==============================
 builder.Services.Configure<LineLoginOptions>(builder.Configuration.GetSection("LineLogin"));
 builder.Services.Configure<FileSettings>(builder.Configuration.GetSection("FileSettings"));
+builder.Services.Configure<PosApiSettings>(builder.Configuration.GetSection("PosAPI"));
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ILineLoginService, LineLoginService>();
@@ -34,6 +35,7 @@ builder.Services.AddScoped<IPointSyncToPosService, PointSyncToPosService>();
 
 builder.Services.AddSignalR();
 
+builder.Services.AddHttpClient("PosApiClient");
 
 // ==============================
 // JWT Authentication
