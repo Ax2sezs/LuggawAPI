@@ -396,6 +396,18 @@ namespace LineLoginBackend.Controllers
             user.Gender = request.Gender;
             user.IsCompleted = request.IsCompleted;
 
+            var existingUserPoints = await _dbContext.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
+            if (existingUserPoints == null)
+            {
+                var userPoints = new UserPoints
+                {
+                    UserId = userId,
+                    TotalPoints = 0
+                };
+                _dbContext.UserPoints.Add(userPoints);
+            }
+
+
             await _dbContext.SaveChangesAsync();
 
             if (IsUserReadyForPOS(user))

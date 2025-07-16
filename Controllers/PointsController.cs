@@ -28,7 +28,7 @@ namespace backend.Controllers
                 return Unauthorized("Invalid User ID in token");
 
             var totalPoints = await _pointService.GetTotalPointsAsync(userId);
-            return Ok(new { userId, totalPoints });
+            return Ok(totalPoints);
         }
 
         [Authorize]

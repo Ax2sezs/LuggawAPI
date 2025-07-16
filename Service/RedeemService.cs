@@ -82,6 +82,71 @@ public class RedeemService : IRedeemService
     //    await _context.SaveChangesAsync();
     //}
 
+    // public async Task RedeemRewardAsync(Guid userId, Guid rewardId)
+    // {
+    //     var user = await _context.Users.FindAsync(userId);
+    //     if (user == null) throw new Exception("User not found");
+
+    //     var reward = await _context.Rewards.FindAsync(rewardId);
+    //     if (reward == null) throw new Exception("Reward not found");
+
+    //     var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+    //         TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+
+    //     if (now < reward.StartDate || now > reward.EndDate)
+    //         throw new Exception("Reward is not available at this time");
+
+    //     var userPoints = await _context.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
+    //     if (userPoints == null || userPoints.TotalPoints < reward.PointsRequired)
+    //         throw new Exception("Insufficient points");
+
+    //     userPoints.TotalPoints -= reward.PointsRequired;
+
+    //     var couponCode = GenerateCouponCode();
+
+    //     var transaction = new PointTransaction
+    //     {
+    //         TransactionId = Guid.NewGuid(),
+    //         UserId = userId,
+    //         RewardId = reward.RewardId,
+    //         RewardName = reward.RewardName,
+    //         Points = -reward.PointsRequired,
+    //         TransactionType = "Redeem",
+    //         TransactionDate = now,
+    //         Description = $"Redeemed: {reward.RewardName}"
+    //     };
+
+    //     _context.PointTransactions.Add(transaction);
+
+    //     var redeemed = new RedeemedReward
+    //     {
+    //         RedeemedRewardId = Guid.NewGuid(),
+    //         UserId = userId,
+    //         RewardId = rewardId,
+    //         RedeemedDate = now,
+    //         IsUsed = false,
+    //         UsedDate = null,
+    //         CouponCode = couponCode,
+    //         RewardType = reward.RewardType,
+    //     };
+
+    //     _context.RedeemedRewards.Add(redeemed);
+    //     user.LastTransactionDate = now;
+
+    //     _context.Users.Update(user);
+    //     try
+    //     {
+    //         await _context.SaveChangesAsync();
+    //     }
+    //     catch (DbUpdateException ex)
+    //     {
+    //         var innerMessage = ex.InnerException?.Message ?? ex.Message;
+    //         throw new Exception("SaveChanges failed: " + innerMessage, ex);
+    //     }
+    //     await _posSyncService.SyncRedeemPointToPosAsync(user.PhoneNumber, (double)reward.PointsRequired);
+
+    // }
+
     public async Task RedeemRewardAsync(Guid userId, Guid rewardId)
     {
         var user = await _context.Users.FindAsync(userId);
@@ -96,13 +161,21 @@ public class RedeemService : IRedeemService
         if (now < reward.StartDate || now > reward.EndDate)
             throw new Exception("Reward is not available at this time");
 
-        var userPoints = await _context.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
-        if (userPoints == null || userPoints.TotalPoints < reward.PointsRequired)
-            throw new Exception("Insufficient points");
-
-        userPoints.TotalPoints -= reward.PointsRequired;
-
         var couponCode = GenerateCouponCode();
+
+        var userPoints = await _context.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
+        if (userPoints == null)
+            throw new Exception("User points not found");
+
+        int pointsToDeduct = reward.RewardType != RewardType.UniqueUse ? reward.PointsRequired : 0;
+
+        if (reward.RewardType != RewardType.UniqueUse)
+        {
+            if (userPoints.TotalPoints < reward.PointsRequired)
+                throw new Exception("Insufficient points");
+
+            userPoints.TotalPoints -= reward.PointsRequired;
+        }
 
         var transaction = new PointTransaction
         {
@@ -110,12 +183,11 @@ public class RedeemService : IRedeemService
             UserId = userId,
             RewardId = reward.RewardId,
             RewardName = reward.RewardName,
-            Points = -reward.PointsRequired,
+            Points = -pointsToDeduct,  // ถ้าแจกฟรีจะเป็น 0
             TransactionType = "Redeem",
             TransactionDate = now,
             Description = $"Redeemed: {reward.RewardName}"
         };
-
         _context.PointTransactions.Add(transaction);
 
         var redeemed = new RedeemedReward
@@ -129,11 +201,11 @@ public class RedeemService : IRedeemService
             CouponCode = couponCode,
             RewardType = reward.RewardType,
         };
-
         _context.RedeemedRewards.Add(redeemed);
-        user.LastTransactionDate = now;
 
+        user.LastTransactionDate = now;
         _context.Users.Update(user);
+
         try
         {
             await _context.SaveChangesAsync();
@@ -143,13 +215,15 @@ public class RedeemService : IRedeemService
             var innerMessage = ex.InnerException?.Message ?? ex.Message;
             throw new Exception("SaveChanges failed: " + innerMessage, ex);
         }
-        await _posSyncService.SyncRedeemPointToPosAsync(user.PhoneNumber, (double)reward.PointsRequired);
 
+        // sync ไป POS เสมอ (ถ้าแจกฟรีจะ sync point = 0)
+        await _posSyncService.SyncRedeemPointToPosAsync(user.PhoneNumber, (double)pointsToDeduct);
     }
+
 
     private string GenerateCouponCode()
     {
-        return $"RW-{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}";
+        return $"{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}";
     }
 
 

@@ -70,7 +70,7 @@ public class PointService : IPointService
     //     };
     // }
 
-    public async Task<int> GetTotalPointsAsync(Guid userId)
+    public async Task<TotalPoint> GetTotalPointsAsync(Guid userId)
     {
         // 1. หา phoneNumber จาก DB
         var phoneNumber = await GetUserPhoneNumberAsync(userId);
@@ -95,7 +95,11 @@ public class PointService : IPointService
             throw new Exception(responseContent?.errMsg ?? "Unknown error from POS API");
 
         // 4. return mem_pointbalance
-        return responseContent.data.mem_pointbalance;
+        return new TotalPoint
+        {
+            UserTotalPoint = responseContent.data.mem_pointbalance,
+            ExpirePoint = responseContent.data.mem_expirepoint
+        };
     }
 
 

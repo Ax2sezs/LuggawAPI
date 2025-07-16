@@ -52,7 +52,6 @@ namespace backend.Service
                 Content = new StringContent(json, Encoding.UTF8, "application/json")
             };
 
-            // ใส่ header API_KEY
             request.Headers.Add("API_KEY", _settings.ApiKey);
 
             try
