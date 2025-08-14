@@ -11,7 +11,7 @@ public class PosService : IPosService
     private readonly AppDbContext _context;
     private readonly IHubContext<CouponHub> _hubContext;
 
-    public PosService(AppDbContext context,IHubContext<CouponHub>hubContext)
+    public PosService(AppDbContext context, IHubContext<CouponHub> hubContext)
     {
         _context = context;
         _hubContext = hubContext;
@@ -28,8 +28,8 @@ public class PosService : IPosService
             .Include(r => r.User)
             .FirstOrDefaultAsync(r => r.CouponCode == couponCode);
 
-        if (rr == null || rr.Reward == null || rr.User == null || rr.IsUsed || rr.Reward.EndDate < now)
-            return null;
+        // if (rr == null || rr.Reward == null || rr.User == null || rr.IsUsed || rr.Reward.EndDate < now)
+        //     return null;
 
         return new PosCouponResponse
         {
@@ -68,10 +68,10 @@ public class PosService : IPosService
                     rewards_name_th = rr.Reward.RewardName,
                     rewards_start = rr.Reward.StartDate,
                     rewards_end = rr.Reward.EndDate,
-                    rewards_discount_type = "",
-                    rewards_amount_min = 0,
-                    rewards_discount_max = "",
-                    rewards_discount_percent = "0",
+                    rewards_discount_type = rr.Reward.DiscountType,
+                    rewards_amount_min = rr.Reward.DiscountMin,
+                    rewards_discount_max = rr.Reward.DiscountMax,
+                    rewards_discount_percent = rr.Reward.DiscountPercent,
                     rewards_category_name = rr.Reward.Category.Name_En,
                     rw_pointperunit = rr.Reward.PointsRequired,
                     rw_count = 1,
@@ -82,7 +82,7 @@ public class PosService : IPosService
         };
     }
 
-    public async Task<bool> MarkCouponAsUsedAsync(string couponCode)
+public async Task<bool> MarkCouponAsUsedAsync(string couponCode, string orderNo, string rewardStatus, string rewardComment)
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
@@ -93,6 +93,9 @@ public class PosService : IPosService
 
         rr.IsUsed = true;
         rr.UsedDate = now;
+        rr.UsedAt = orderNo;
+        rr.RewardStatus = rewardStatus;
+        rr.RewardComment = rewardComment;
         await _context.SaveChangesAsync();
 
         await _hubContext.Clients.User(rr.UserId.ToString())

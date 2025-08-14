@@ -21,6 +21,8 @@ using LineLoginBackend.Data;
 using backend.Service.Interfaces; // ให้แน่ใจว่ามี usings ที่ถูกต้อง
 using Newtonsoft.Json.Linq;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Cryptography;
+
 
 
 namespace backend.Services
@@ -32,24 +34,30 @@ namespace backend.Services
         private readonly IConfiguration _configuration;
         private readonly AppDbContext _dbContext; // ✅ ประกาศตัวแปร
         private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly PosApiSettings _settings;
 
 
-        public LineLoginService(HttpClient httpClient, IOptions<LineLoginOptions> options,IConfiguration configuration,AppDbContext dbContext, IHttpContextAccessor httpContextAccessor)
+        public LineLoginService(HttpClient httpClient, IOptions<LineLoginOptions> options, IConfiguration configuration, AppDbContext dbContext, IHttpContextAccessor httpContextAccessor, IOptions<PosApiSettings> posApiOptions)
         {
             _httpClient = httpClient;
             _options = options.Value;
             _configuration = configuration;
             _dbContext = dbContext;
             _httpContextAccessor = httpContextAccessor;
+            _settings = posApiOptions.Value;
+            _httpClient.DefaultRequestHeaders.Add("API_KEY", _settings.ApiKey);
+
         }
-        public string GenerateJwtToken(Guid userId, string lineUserId)
+        public string GenerateJwtToken(Guid userId, string lineUserId, string? role = null)
         {
+            var assignedRole = string.IsNullOrEmpty(role) ? "User" : role;
             var claims = new[]
             {
          new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
         new Claim(JwtRegisteredClaimNames.UniqueName, lineUserId),
-        new Claim(ClaimTypes.NameIdentifier, userId.ToString()), 
-        new Claim(ClaimTypes.Name, lineUserId)
+        new Claim(ClaimTypes.NameIdentifier, userId.ToString()),
+        new Claim(ClaimTypes.Name, lineUserId),
+        new Claim(ClaimTypes.Role, assignedRole) // เพิ่ม role เข้า claims
 
         };
 
@@ -137,7 +145,7 @@ namespace backend.Services
             var user = await _dbContext.Users
                 .Include(u => u.UserPoint)
                 .FirstOrDefaultAsync(u => u.LineUserId == userId);
-            
+
             if (user == null) return null;
 
             return new UserDetails
@@ -193,7 +201,146 @@ namespace backend.Services
             await _dbContext.SaveChangesAsync();
         }
 
+        public async Task<bool> IsPhoneNumberInUseAsync(string phoneNumber, Guid excludeUserId)
+        {
+            return await _dbContext.Users.AnyAsync(u => u.PhoneNumber == phoneNumber && u.UserId != excludeUserId);
+        }
+
+        public async Task<(bool success, string? signature, long timestamp)> UpdatePhoneNumberWithSignatureAsync(Guid userId, string newPhoneNumber)
+        {
+            return await UpdatePhoneNumberAndNotifyExternalAsync(userId, newPhoneNumber);
+        }
 
 
+        private async Task<(bool success, string? signature, long timestamp)> UpdatePhoneNumberAndNotifyExternalAsync(Guid userId, string newPhoneNumber)
+        {
+            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+                TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+
+            var user = await _dbContext.Users.FindAsync(userId);
+            if (user == null) return (false, null, 0);
+
+            var oldPhone = user.PhoneNumber;
+            var memId = user.UserId; // ต้องแน่ใจว่า user มี property นี้ใน model
+            // var isPhoneUsedByOtherUser = await _dbContext.PhoneNumbers
+            //     .AnyAsync(p => p.Phone_Number == newPhoneNumber && p.UserId != userId);
+
+            // if (isPhoneUsedByOtherUser)
+            // {
+            //     return (false, null, 0); // หรือ throw error ก็ได้
+            // }
+
+            var existingPhone = await _dbContext.PhoneNumbers
+                .FirstOrDefaultAsync(p => p.UserId == userId && p.Phone_Number == newPhoneNumber);
+
+            var allUserPhones = await _dbContext.PhoneNumbers
+                .Where(p => p.UserId == userId && p.Phone_Number != newPhoneNumber)
+                .ToListAsync();
+
+            foreach (var phone in allUserPhones)
+                phone.IsActive = false;
+
+            if (existingPhone != null)
+            {
+                existingPhone.IsActive = true;
+                existingPhone.UpdatedAt = now;
+            }
+            else
+            {
+                var newEntry = new PhoneNumber
+                {
+                    UserId = userId,
+                    Phone_Number = newPhoneNumber,
+                    IsActive = true,
+                    CreatedAt = now
+                };
+                _dbContext.PhoneNumbers.Add(newEntry);
+            }
+
+            user.PhoneNumber = newPhoneNumber;
+            await _dbContext.SaveChangesAsync();
+
+            var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+            var rawData = oldPhone + "|" + timestamp;
+            var secretKey = _configuration["SecretKeys:PhoneSignature"];
+
+            string signature;
+            using (var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(secretKey)))
+            {
+                var hashBytes = hmac.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+                signature = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
+            }
+
+            var httpClient = _httpClient;
+            var externalUrl = _settings.BaseUrl + _settings.Endpoints.ChangePhoneNumber;
+
+            var body = new
+            {
+                mem_old_phone = oldPhone,
+                mem_new_phone = newPhoneNumber,
+                mem_id = memId
+            };
+
+            var content = new StringContent(JsonSerializer.Serialize(body), Encoding.UTF8, "application/json");
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+
+            httpClient.DefaultRequestHeaders.Add("X-Timestamp", timestamp.ToString());
+            httpClient.DefaultRequestHeaders.Add("X-Signature", signature);
+
+            try
+            {
+                var response = await httpClient.PostAsync(externalUrl, content);
+                if (!response.IsSuccessStatusCode)
+                {
+                    // log หรือแจ้ง error ได้ตามต้องการ
+                }
+            }
+            catch (Exception ex)
+            {
+                // log หรือแจ้ง error ได้ตามต้องการ
+            }
+
+            return (true, signature, timestamp);
+        }
+        public async Task<bool> IsPhoneNumberAlreadyUsedAsync(string phoneNumber, Guid? currentUserId = null)
+        {
+            return await _dbContext.PhoneNumbers
+                .AnyAsync(p => p.Phone_Number == phoneNumber && (currentUserId == null || p.UserId != currentUserId));
+        }
+        public async Task<EditProfileRequest?> EditProfileNameAsync(Guid userId, EditProfileDto dto)
+        {
+            var user = await _dbContext.Users.FindAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            // 1. Update DB ของเรา
+            user.FirstName = dto.FirstName;
+            user.LastName = dto.LastName;
+            await _dbContext.SaveChangesAsync();
+
+            if (string.IsNullOrEmpty(user.PhoneNumber))
+                throw new Exception("Phone number missing");
+
+            // 2. Prepare & Call POS
+            var requestBody = new
+            {
+                mem_firstname = user.FirstName,
+                mem_lastname = user.LastName,
+                mem_phone = user.PhoneNumber
+            };
+
+            var url = _settings.BaseUrl + _settings.Endpoints.EditProfile;
+
+            var response = await _httpClient.PostAsJsonAsync(url, requestBody);
+            var responseText = await response.Content.ReadAsStringAsync();
+
+            Console.WriteLine($"POS EditProfile Response: {response.StatusCode}, Body: {responseText}");
+
+            if (!response.IsSuccessStatusCode)
+                throw new Exception("POS API failed");
+
+            var result = JsonSerializer.Deserialize<EditProfileRequest>(responseText);
+            return result;
+        }
     }
 }

@@ -98,7 +98,9 @@ public class PointService : IPointService
         return new TotalPoint
         {
             UserTotalPoint = responseContent.data.mem_pointbalance,
-            ExpirePoint = responseContent.data.mem_expirepoint
+            ExpirePoint = responseContent.data.mem_expirepoint,
+            UserPointLastYear = responseContent.data.mem_pointlastyear,
+            ExpirePointLastYear = responseContent.data.mem_expirepointlastyear,
         };
     }
 
@@ -158,25 +160,109 @@ public class PointService : IPointService
         };
     }
 
-
-
-
-    public async Task EarnPointsAsync(string phoneNumber, int points, string? description)
+    public async Task<bool> HasTransactionHistoryAsync(string phoneNumber)
     {
-        // หา User ด้วยเบอร์โทร
+        var requestBody = new { mem_phone = phoneNumber };
+        var url = _settings.BaseUrl + _settings.Endpoints.GetPointHistory;
+        var response = await _httpClient.PostAsJsonAsync(url, requestBody);
+        var responseText = await response.Content.ReadAsStringAsync();
+
+        var responseContent = JsonSerializer.Deserialize<PosApiResponse>(responseText);
+
+        if (responseContent?.isSuccess != true || responseContent?.data == null)
+            return false;
+
+        return responseContent.data.Any(d =>
+        d.pointType?.Equals("Earn", StringComparison.OrdinalIgnoreCase) == true
+    );
+    }
+
+
+
+
+
+    //     public async Task EarnPointsAsync(string phoneNumber, int points, string? description)
+    //     {
+    //         // หา User ด้วยเบอร์โทร
+    //         var user = await _context.Users.FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber);
+    //         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+    //                     TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+    //         if (user == null)
+    //         {
+    //             // สร้าง User ใหม่ถ้ายังไม่มี
+    //             throw new Exception("ไม่พบผู้ใช้นี้ในระบบ กรุณาลงทะเบียนก่อนทำรายการ");
+    //         }
+
+    //         var userId = user.UserId;
+
+
+    //         // เพิ่มประวัติการทำรายการแต้ม
+    //         var transaction = new PointTransaction
+    //         {
+    //             TransactionId = Guid.NewGuid(),
+    //             UserId = userId,
+    //             Points = points,
+    //             TransactionType = "Earn",
+    //             TransactionDate = now,
+    //             Description = description
+    //         };
+    //         _context.PointTransactions.Add(transaction);
+
+    //         // เพิ่มแต้มสะสม
+    //         var userPoints = await _context.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
+
+    //         if (userPoints == null)
+    //         {
+    //             userPoints = new UserPoints
+    //             {
+    //                 UserPointId = Guid.NewGuid(),
+    //                 UserId = userId,
+    //                 TotalPoints = points
+    //             };
+    //             _context.UserPoints.Add(userPoints);
+    //         }
+    //         else
+    //         {
+    //             userPoints.TotalPoints += points;
+    //             _context.UserPoints.Update(userPoints);
+    //         }
+    //         user.LastTransactionDate = now;
+    //         _context.Users.Update(user);
+
+    //         await _context.SaveChangesAsync();
+    //         try
+    //         {
+    //             var success = await _posSyncService.SyncEarnPointToPosAsync(phoneNumber, points);
+    //             if (!success)
+    //             {
+    //                 Console.WriteLine("⚠️ POS Sync Failed");
+    //                 // คุณจะเลือก throw หรือ log เฉยๆ ก็ได้
+    //             }
+    //         }
+    //         catch (Exception ex)
+    //         {
+    //             Console.WriteLine("❌ POS Sync Exception: " + ex.Message);
+    //             // ถ้าคุณไม่อยากให้ POS พังแล้วทำให้ Web Fail → จับแยกไว้เลย
+    //         }
+
+    //     }
+    public async Task EarnPointsAsync(EarnPointRequest request)
+    {
+        var phoneNumber = request.PhoneNumber;
+        var points = request.Points;
+        var description = request.Description;
+
         var user = await _context.Users.FirstOrDefaultAsync(u => u.PhoneNumber == phoneNumber);
         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
                     TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+
         if (user == null)
         {
-            // สร้าง User ใหม่ถ้ายังไม่มี
             throw new Exception("ไม่พบผู้ใช้นี้ในระบบ กรุณาลงทะเบียนก่อนทำรายการ");
         }
 
         var userId = user.UserId;
 
-
-        // เพิ่มประวัติการทำรายการแต้ม
         var transaction = new PointTransaction
         {
             TransactionId = Guid.NewGuid(),
@@ -184,47 +270,40 @@ public class PointService : IPointService
             Points = points,
             TransactionType = "Earn",
             TransactionDate = now,
-            Description = description
+            Description = description,
+
+            EarnCode = request.EarnCode,
+            EarnName = request.EarnName,
+            EarnNameEn = request.EarnNameEn,
+            OrderRef = request.OrderRef,
+            RemainPoint = request.RemainPoint,
+            ExpiredAt = request.ExpiredAt,
+            BranchCode = request.BranchCode
         };
         _context.PointTransactions.Add(transaction);
 
-        // เพิ่มแต้มสะสม
-        var userPoints = await _context.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
+        // var userPoints = await _context.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
+        // if (userPoints == null)
+        // {
+        //     userPoints = new UserPoints
+        //     {
+        //         UserPointId = Guid.NewGuid(),
+        //         UserId = userId,
+        //         TotalPoints = points
+        //     };
+        //     _context.UserPoints.Add(userPoints);
+        // }
+        // else
+        // {
+        //     userPoints.TotalPoints += points;
+        //     _context.UserPoints.Update(userPoints);
+        // }
 
-        if (userPoints == null)
-        {
-            userPoints = new UserPoints
-            {
-                UserPointId = Guid.NewGuid(),
-                UserId = userId,
-                TotalPoints = points
-            };
-            _context.UserPoints.Add(userPoints);
-        }
-        else
-        {
-            userPoints.TotalPoints += points;
-            _context.UserPoints.Update(userPoints);
-        }
         user.LastTransactionDate = now;
         _context.Users.Update(user);
 
         await _context.SaveChangesAsync();
-        try
-        {
-            var success = await _posSyncService.SyncEarnPointToPosAsync(phoneNumber, points);
-            if (!success)
-            {
-                Console.WriteLine("⚠️ POS Sync Failed");
-                // คุณจะเลือก throw หรือ log เฉยๆ ก็ได้
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine("❌ POS Sync Exception: " + ex.Message);
-            // ถ้าคุณไม่อยากให้ POS พังแล้วทำให้ Web Fail → จับแยกไว้เลย
-        }
-
     }
+
 
 }

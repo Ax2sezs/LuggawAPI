@@ -9,12 +9,14 @@ public class RewardService : IRewardService
     private readonly AppDbContext _context;
     private readonly IWebHostEnvironment _environment;
     private readonly FileSettings _fileSettings;
+    private readonly IPointService _pointService;
 
-    public RewardService(AppDbContext context, IWebHostEnvironment environment, IOptions<FileSettings> fileSettings)
+    public RewardService(AppDbContext context, IWebHostEnvironment environment, IOptions<FileSettings> fileSettings, IPointService pointService)
     {
         _context = context;
         _environment = environment;
         _fileSettings = fileSettings.Value;
+        _pointService = pointService;
     }
 
     //public async Task<IEnumerable<Rewards>> GetAvailableRewardsAsync(Guid userId)
@@ -49,7 +51,7 @@ public class RewardService : IRewardService
         // 1. ดึงวันเกิดของผู้ใช้
         var user = await _context.Users
             .Where(u => u.UserId == userId)
-            .Select(u => new { u.BirthDate })
+            .Select(u => new { u.BirthDate, u.PhoneNumber })
             .FirstOrDefaultAsync();
 
         if (user == null)
@@ -78,32 +80,28 @@ public class RewardService : IRewardService
             .Select(rr => rr.RewardId)
             .Distinct()
             .ToListAsync();
+        var hasHistory = await _pointService.HasTransactionHistoryAsync(user.PhoneNumber);
 
         // 5. กรองผลลัพธ์ตามประเภท
         var filtered = rewards
-            .Where(r =>
-                r.RewardType == RewardType.General || // ทั่วไป แสดงเสมอ
-                (
-                    r.RewardType == RewardType.UniqueUse &&
-                    birthMonth == currentMonth &&
-                    !redeemedRewardIds.Contains(r.RewardId)
-                ) ||
-                (
-                    r.RewardType == RewardType.Exclusive &&
-                    !allRedeemedExclusiveRewardIds.Contains(r.RewardId)
-                )
-            )
-            .ToList();
+     .Where(r =>
+         r.RewardType == RewardType.General || // แสดงเสมอ
+         (
+             r.RewardType == RewardType.UniqueUse &&
+             birthMonth == currentMonth &&
+             !redeemedRewardIds.Contains(r.RewardId) &&
+             hasHistory
+         ) ||
+         (
+             r.RewardType == RewardType.Exclusive &&
+             !redeemedRewardIds.Contains(r.RewardId) // แก้ตรงนี้
+         )
+     )
+     .ToList();
+
 
         return filtered;
     }
-
-
-
-
-
-
-
 
 }
 

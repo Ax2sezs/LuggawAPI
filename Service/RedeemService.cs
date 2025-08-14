@@ -7,16 +7,22 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json.Linq;
 using static Microsoft.EntityFrameworkCore.DbLoggerCategory.Database;
+using System.Collections.Concurrent;
 
 public class RedeemService : IRedeemService
 {
     private readonly AppDbContext _context;
     private readonly IPointSyncToPosService _posSyncService;
+    private readonly PointService _pointService;
+    private readonly ILogger<RedeemService> _logger;
 
-    public RedeemService(AppDbContext context, IPointSyncToPosService posSyncService)
+    public RedeemService(AppDbContext context, IPointSyncToPosService posSyncService, PointService pointService, ILogger<RedeemService> logger)
     {
         _context = context;
         _posSyncService = posSyncService;
+        _pointService = pointService;
+        _logger = logger;
+
     }
 
     //public async Task RedeemRewardAsync(Guid userId, Guid rewardId)
@@ -147,84 +153,85 @@ public class RedeemService : IRedeemService
 
     // }
 
-    public async Task RedeemRewardAsync(Guid userId, Guid rewardId)
-    {
-        var user = await _context.Users.FindAsync(userId);
-        if (user == null) throw new Exception("User not found");
+    // public async Task RedeemRewardAsync(Guid userId, Guid rewardId)
+    // {
+    //     var user = await _context.Users.FindAsync(userId);
+    //     if (user == null) throw new Exception("User not found");
 
-        var reward = await _context.Rewards.FindAsync(rewardId);
-        if (reward == null) throw new Exception("Reward not found");
+    //     var reward = await _context.Rewards.FindAsync(rewardId);
+    //     if (reward == null) throw new Exception("Reward not found");
 
-        var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
-            TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+    //     var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+    //         TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
 
-        if (now < reward.StartDate || now > reward.EndDate)
-            throw new Exception("Reward is not available at this time");
+    //     if (now < reward.StartDate || now > reward.EndDate)
+    //         throw new Exception("Reward is not available at this time");
 
-        var couponCode = GenerateCouponCode();
+    //     var couponCode = GenerateCouponCode();
 
-        var userPoints = await _context.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
-        if (userPoints == null)
-            throw new Exception("User points not found");
+    //     var userPoints = await _context.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
+    //     if (userPoints == null)
+    //         throw new Exception("User points not found");
 
-        int pointsToDeduct = reward.RewardType != RewardType.UniqueUse ? reward.PointsRequired : 0;
+    //     int pointsToDeduct = reward.RewardType != RewardType.UniqueUse ? reward.PointsRequired : 0;
 
-        if (reward.RewardType != RewardType.UniqueUse)
-        {
-            if (userPoints.TotalPoints < reward.PointsRequired)
-                throw new Exception("Insufficient points");
+    //     if (reward.RewardType != RewardType.UniqueUse)
+    //     {
+    //         if (userPoints.TotalPoints < reward.PointsRequired)
+    //             throw new Exception("Insufficient points");
 
-            userPoints.TotalPoints -= reward.PointsRequired;
-        }
+    //         userPoints.TotalPoints -= reward.PointsRequired;
+    //     }
 
-        var transaction = new PointTransaction
-        {
-            TransactionId = Guid.NewGuid(),
-            UserId = userId,
-            RewardId = reward.RewardId,
-            RewardName = reward.RewardName,
-            Points = -pointsToDeduct,  // ถ้าแจกฟรีจะเป็น 0
-            TransactionType = "Redeem",
-            TransactionDate = now,
-            Description = $"Redeemed: {reward.RewardName}"
-        };
-        _context.PointTransactions.Add(transaction);
+    //     var transaction = new PointTransaction
+    //     {
+    //         TransactionId = Guid.NewGuid(),
+    //         UserId = userId,
+    //         RewardId = reward.RewardId,
+    //         RewardName = reward.RewardName,
+    //         Points = -pointsToDeduct,  // ถ้าแจกฟรีจะเป็น 0
+    //         TransactionType = "Redeem",
+    //         TransactionDate = now,
+    //         Description = $"Redeemed: {reward.RewardName}"
+    //     };
+    //     _context.PointTransactions.Add(transaction);
 
-        var redeemed = new RedeemedReward
-        {
-            RedeemedRewardId = Guid.NewGuid(),
-            UserId = userId,
-            RewardId = rewardId,
-            RedeemedDate = now,
-            IsUsed = false,
-            UsedDate = null,
-            CouponCode = couponCode,
-            RewardType = reward.RewardType,
-        };
-        _context.RedeemedRewards.Add(redeemed);
+    //     var redeemed = new RedeemedReward
+    //     {
+    //         RedeemedRewardId = Guid.NewGuid(),
+    //         UserId = userId,
+    //         RewardId = rewardId,
+    //         RedeemedDate = now,
+    //         IsUsed = false,
+    //         UsedDate = null,
+    //         CouponCode = couponCode,
+    //         RewardType = reward.RewardType,
+    //     };
+    //     _context.RedeemedRewards.Add(redeemed);
 
-        user.LastTransactionDate = now;
-        _context.Users.Update(user);
+    //     user.LastTransactionDate = now;
+    //     _context.Users.Update(user);
 
-        try
-        {
-            await _context.SaveChangesAsync();
-        }
-        catch (DbUpdateException ex)
-        {
-            var innerMessage = ex.InnerException?.Message ?? ex.Message;
-            throw new Exception("SaveChanges failed: " + innerMessage, ex);
-        }
+    //     try
+    //     {
+    //         await _context.SaveChangesAsync();
+    //     }
+    //     catch (DbUpdateException ex)
+    //     {
+    //         var innerMessage = ex.InnerException?.Message ?? ex.Message;
+    //         throw new Exception("SaveChanges failed: " + innerMessage, ex);
+    //     }
 
-        // sync ไป POS เสมอ (ถ้าแจกฟรีจะ sync point = 0)
-        await _posSyncService.SyncRedeemPointToPosAsync(user.PhoneNumber, (double)pointsToDeduct);
-    }
+    //     // sync ไป POS เสมอ (ถ้าแจกฟรีจะ sync point = 0)
+    //     await _posSyncService.SyncRedeemPointToPosAsync(user.PhoneNumber, (double)pointsToDeduct);
+    // }
 
 
     private string GenerateCouponCode()
     {
-        return $"{Guid.NewGuid().ToString().Substring(0, 8).ToUpper()}";
+        return Guid.NewGuid().ToString("N").Substring(0, 16).ToUpper();
     }
+
 
 
     //public async Task<List<UserRedeemed>> GetMyRedeemedAsync(Guid userId)
@@ -251,6 +258,107 @@ public class RedeemService : IRedeemService
     //        })
     //        .ToListAsync();
     //}
+
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _redeemLocks = new();
+
+    public async Task RedeemRewardAsync(Guid userId, Guid rewardId)
+    {
+        string lockKey = $"{userId}_{rewardId}";
+        var semaphore = _redeemLocks.GetOrAdd(lockKey, _ => new SemaphoreSlim(1, 1));
+
+        await semaphore.WaitAsync();
+        try
+        {
+            var strategy = _context.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync(System.Data.IsolationLevel.Serializable);
+
+                // 1. Lock แถว User เพื่อเช็คแต้มหรือสถานะ
+                var user = await _context.Users
+                    .FromSqlRaw("SELECT * FROM Users WITH (UPDLOCK, ROWLOCK) WHERE UserId = {0}", userId)
+                    .FirstOrDefaultAsync();
+
+                if (user == null)
+                    throw new Exception("User not found");
+
+                var reward = await _context.Rewards.FindAsync(rewardId);
+                if (reward == null)
+                    throw new Exception("Reward not found");
+
+                var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+                    TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+
+                if (now < reward.StartDate || now > reward.EndDate)
+                    throw new Exception("Reward is not available at this time");
+
+                // 2. Lock แถว RedeemedRewards เพื่อเช็คซ้ำ
+                var alreadyRedeemedCount = await _context.RedeemedRewards
+     .FromSqlRaw("SELECT * FROM RedeemedRewards WITH (UPDLOCK, ROWLOCK) WHERE UserId = {0} AND RewardId = {1}", userId, rewardId)
+     .CountAsync();
+
+                bool alreadyRedeemed = alreadyRedeemedCount > 0;
+
+
+                if (reward.RewardType != RewardType.General && alreadyRedeemed)
+                    throw new Exception("You have already redeemed this reward.");
+
+                int pointsToDeduct = reward.RewardType != RewardType.UniqueUse ? reward.PointsRequired : 0;
+
+                if (reward.RewardType != RewardType.UniqueUse)
+                {
+                    var posResult = await _posSyncService.SyncRedeemPointToPosAsync(user.PhoneNumber, (double)pointsToDeduct);
+                    if (posResult == null || !posResult.isSuccess || posResult.data != "complete")
+                        throw new Exception("Insufficient points or POS redeem failed: " + posResult?.data);
+                }
+
+                // 4. บันทึกข้อมูล Redeem และ Transaction
+                var couponCode = GenerateCouponCode();
+
+                var transactionEntity = new PointTransaction
+                {
+                    TransactionId = Guid.NewGuid(),
+                    UserId = userId,
+                    RewardId = reward.RewardId,
+                    RewardName = reward.RewardName,
+                    Points = -pointsToDeduct,
+                    TransactionType = "Redeem",
+                    TransactionDate = now,
+                    Description = $"Redeemed: {reward.RewardName}",
+                    OrderRef = couponCode
+                };
+                _context.PointTransactions.Add(transactionEntity);
+
+                var redeemed = new RedeemedReward
+                {
+                    RedeemedRewardId = Guid.NewGuid(),
+                    UserId = userId,
+                    RewardId = rewardId,
+                    RedeemedDate = now,
+                    IsUsed = false,
+                    UsedDate = null,
+                    CouponCode = couponCode,
+                    RewardType = reward.RewardType,
+                };
+                _context.RedeemedRewards.Add(redeemed);
+
+                user.LastTransactionDate = now;
+                _context.Users.Update(user);
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            });
+        }
+        finally
+        {
+            semaphore.Release();
+            _redeemLocks.TryRemove(lockKey, out _);
+        }
+    }
+
+
+
+
     public async Task<PagedResult<UserRedeemed>> GetMyRedeemedAsync(
      Guid userId, string status = "all", int page = 1, int pageSize = 10)
     {

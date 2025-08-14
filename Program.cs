@@ -30,6 +30,11 @@ builder.Services.AddScoped<IFeedService, FeedService>();
 builder.Services.AddScoped<IPosService, PosService>();
 builder.Services.AddScoped<LineLoginService>();
 builder.Services.AddScoped<IPointSyncToPosService, PointSyncToPosService>();
+builder.Services.AddScoped<PointService>();
+builder.Services.AddScoped<IOtpService, OtpService>();
+
+builder.Services.AddLogging();
+
 
 
 
@@ -60,7 +65,7 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = jwtAudience,
         ValidateIssuerSigningKey = true,
         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey!)),
-        ValidateLifetime = true
+        // ValidateLifetime = true,
     };
     options.Events = new JwtBearerEvents
     {
@@ -148,8 +153,20 @@ var app = builder.Build();
 // ==============================
 // Middlewares
 // ==============================
-app.UseSwagger();
-app.UseSwaggerUI();
+
+if (app.Environment.IsDevelopment())
+{
+    // ใช้ Developer Exception Page เฉพาะตอน Dev
+    app.UseDeveloperExceptionPage();
+
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+else
+{
+    // ✅ ซ่อน error ที่ละเอียดใน Production
+    app.UseExceptionHandler("/error");
+}
 
 
 app.UseHttpsRedirection();

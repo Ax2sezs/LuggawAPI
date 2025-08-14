@@ -79,15 +79,14 @@ public class Connection
             //    config["PASS"] = "au.2020";
             //}
 
-            m_connectionString = "Server=192.168.11.3\\MSSQLSERVER,1590;Database=AUPOS_UAT;User Id=super_dev_test;Password=vkag9viNp^mflv[7890@@1;TrustServerCertificate=True;";
-
+            m_connectionString = "Server=192.168.11.1,1319;Database=LGPOS;User Id=super_au;Password=vkag9viNp^$1319^&;TrustServerCertificate=True;";
+            // m_connectionString = "Data Source=192.168.11.3\\MSSQLSERVER,1590;Initial Catalog=AUPOS;persist security info=True;User id=super_au; Password=vkag9viNp^$1319^&";
             //m_connectionString = $@"Data Source={config["TARGET_DB"]};Initial Catalog={config["CATALOG"]};User ID={config["USER"]};Password={config["PASS"]};Connection Timeout=15";
         }
         catch (Exception e)
         {
             Logger.GetSingleton().LogEvent("ErrInit.txt", e.Message);
         }
-
     }
     public Task<JObject> ExcuteQueryReturnSelectStatementJson(string commandString)
     {
@@ -336,7 +335,8 @@ public class Connection
         returnValues.Add("Data", "");
         try
         {
-            conn.ConnectionString = "Data Source=192.168.11.3\\MSSQLSERVER,1590;Initial Catalog=AUPOS;persist security info=True;User id=super_au; Password=vkag9viNp^$1319^&";
+            conn.ConnectionString = "Data Source=192.168.11.1\\MSSQLSERVER,1319;Initial Catalog=LGPOS;persist security info=True;User id=super_au; Password=vkag9viNp^$1319^&";
+            // conn.ConnectionString = "Data Source=192.168.11.3\\MSSQLSERVER,1590;Initial Catalog=AUPOS;persist security info=True;User id=super_au; Password=vkag9viNp^$1319^&";
             if (conn.State != ConnectionState.Open)
             {
                 conn.Open();

@@ -63,8 +63,8 @@ namespace backend.Services
             var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
 
             var query = _context.Users
-                .Include(u => u.UserPoint)
-                .AsNoTracking()
+            //     .Include(u => u.UserPoint)
+                 .AsNoTracking()
                 .AsQueryable();
 
             // Filter: ค้นหาชื่อ (DisplayName) หรือเบอร์โทร (PhoneNumber) ถ้ามีค่า searchTerm
@@ -72,7 +72,8 @@ namespace backend.Services
             {
                 string loweredTerm = searchTerm.Trim().ToLower();
                 query = query.Where(u =>
-                    (u.DisplayName != null && u.DisplayName.ToLower().Contains(loweredTerm))
+                    (u.FirstName != null && u.FirstName.ToLower().Contains(loweredTerm))
+                    || (u.LastName != null && u.LastName.ToLower().Contains(loweredTerm))
                     || (u.PhoneNumber != null && u.PhoneNumber.ToLower().Contains(loweredTerm))
                 );
             }
@@ -98,7 +99,7 @@ namespace backend.Services
             var totalItems = await query.CountAsync();
 
             var userList = await query
-                .OrderBy(u => u.CreatedAt)
+                .OrderByDescending(u => u.CreatedAt)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
@@ -106,11 +107,12 @@ namespace backend.Services
             var users = userList.Select(u => new ShowAllUser
             {
                 UserId = u.UserId,
+                FirstName = u.FirstName,
+                LastName = u.LastName,
                 CreatedAt = u.CreatedAt,
                 PhoneNumber = u.PhoneNumber,
                 BirthDate = u.BirthDate,
                 Gender = u.Gender,
-                Point = u.UserPoint?.TotalPoints,
                 IsActive = u.IsActive,
                 Age = u.BirthDate.HasValue
                     ? (now.Year - u.BirthDate.Value.Year - (u.BirthDate.Value.Date > now.Date.AddYears(-(now.Year - u.BirthDate.Value.Year)) ? 1 : 0))
@@ -144,7 +146,7 @@ namespace backend.Services
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             var random = new Random();
-            return new string(Enumerable.Repeat(chars, 8)
+            return new string(Enumerable.Repeat(chars, 16)
                 .Select(s => s[random.Next(s.Length)]).ToArray());
         }
 
@@ -205,7 +207,12 @@ namespace backend.Services
                     CouponCode = rewardCode,  // ใช้โค้ดที่ generate ใหม่
                     CategoryId = request.CategoryId,
                     IsActive = request.IsActive,
-                    RewardType = request.RewardType
+                    RewardType = request.RewardType,
+                    DiscountMax = request.DiscountMax,
+                    DiscountMin = request.DiscountMin,
+                    DiscountPercent = request.DiscountPercent,
+                    DiscountType = request.DiscountType,
+
                 };
 
                 if (request.Image != null && request.Image.Length > 0)
@@ -266,6 +273,14 @@ namespace backend.Services
                 reward.CategoryId = updateDto.CategoryId.Value;
             if (updateDto.RewardType.HasValue)
                 reward.RewardType = updateDto.RewardType.Value;
+            if (!string.IsNullOrEmpty(updateDto.DiscountMin))
+                reward.DiscountMin = updateDto.DiscountMin;
+            if (!string.IsNullOrEmpty(updateDto.DiscountMax))
+                reward.DiscountMax = updateDto.DiscountMax;
+            if (!string.IsNullOrEmpty(updateDto.DiscountPercent))
+                reward.DiscountPercent = updateDto.DiscountPercent;
+            if (!string.IsNullOrEmpty(updateDto.DiscountType))
+                reward.DiscountType = updateDto.DiscountType;
 
 
             reward.UpdateAt = now;
@@ -558,6 +573,7 @@ namespace backend.Services
                 query = query.Where(t =>
                     t.Description.Contains(search) ||
                     t.RewardName.Contains(search));
+                    
             }
 
             if (!string.IsNullOrEmpty(transactionType))
@@ -599,13 +615,22 @@ namespace backend.Services
                 {
                     TransactionId = t.TransactionId,
                     UserId = t.UserId,
+                    FirstName = t.User.FirstName,
+                    LastName = t.User.LastName,
                     RewardId = t.RewardId,
                     RewardName = t.RewardName,
                     Points = t.Points,
                     TransactionType = t.TransactionType,
                     TransactionDate = t.TransactionDate,
                     Description = t.Description,
-                    PhoneNumber = t.User.PhoneNumber
+                    PhoneNumber = t.User.PhoneNumber,
+                    EarnCode = t.EarnCode,
+                    EarnName = t.EarnName,
+                    EarnNameEn = t.EarnNameEn,
+                    OrderRef = t.OrderRef,
+                    RemainPoint = t.RemainPoint,
+                    ExpiredAt = t.ExpiredAt,
+                    BranchCode = t.BranchCode+"-"+t.OrderRef,
                 })
                 .ToListAsync();
 
@@ -617,10 +642,103 @@ namespace backend.Services
                 PageSize = pageSize
             };
         }
+
+        // Services/AdminService.cs
+        // public async Task<PagedResult<AllTransaction>> GetAllTransactionsAsync(TransactionFilterDto filter)
+        // {
+        //     var query = _context.PointTransactions
+        //         .Include(t => t.User)
+        //         .AsQueryable();
+
+        //     // Apply filters
+        //     if (!string.IsNullOrEmpty(filter.Search))
+        //     {
+        //         query = query.Where(t =>
+        //             t.Description.Contains(filter.Search) ||
+        //             t.RewardName.Contains(filter.Search));
+        //     }
+
+        //     if (!string.IsNullOrEmpty(filter.TransactionType))
+        //     {
+        //         query = query.Where(t => t.TransactionType == filter.TransactionType);
+        //     }
+
+        //     if (!string.IsNullOrEmpty(filter.RewardName))
+        //     {
+        //         query = query.Where(t => t.RewardName.Contains(filter.RewardName));
+        //     }
+
+        //     if (!string.IsNullOrEmpty(filter.PhoneNumber))
+        //     {
+        //         query = query.Where(t => t.User.PhoneNumber.Contains(filter.PhoneNumber));
+        //     }
+
+        //     if (filter.StartDate.HasValue)
+        //     {
+        //         query = query.Where(t => t.TransactionDate >= filter.StartDate.Value);
+        //     }
+
+        //     if (filter.EndDate.HasValue)
+        //     {
+        //         query = query.Where(t => t.TransactionDate <= filter.EndDate.Value);
+        //     }
+
+        //     // POS-specific filters (optional)
+        //     if (!string.IsNullOrEmpty(filter.P_Member_Phone))
+        //     {
+        //         query = query.Where(t => t.User.PhoneNumber.Contains(filter.P_Member_Phone));
+        //     }
+
+        //     if (!string.IsNullOrEmpty(filter.Order_Ref))
+        //     {
+        //         query = query.Where(t => t.Description.Contains(filter.Order_Ref));
+        //     }
+
+        //     // Order
+        //     query = query.OrderByDescending(t => t.TransactionDate);
+
+        //     var totalCount = await query.CountAsync();
+
+        //     var items = await query
+        //         .Skip((filter.Page - 1) * filter.PageSize)
+        //         .Take(filter.PageSize)
+        //         .Select(t => new AllTransaction
+        //         {
+        //             TransactionId = t.TransactionId,
+        //             UserId = t.UserId,
+        //             RewardId = t.RewardId,
+        //             RewardName = t.RewardName,
+        //             Points = t.Points,
+        //             TransactionType = t.TransactionType,
+        //             TransactionDate = t.TransactionDate,
+        //             Description = t.Description,
+        //             PhoneNumber = t.User.PhoneNumber,
+        //             EarnCode = t.EarnCode,
+        //             EarnName = t.EarnName,
+        //             EarnNameEn = t.EarnNameEn,
+        //             OrderRef = t.OrderRef,
+        //             RemainPoint = t.RemainPoint,
+        //             ExpiredAt = t.ExpiredAt,
+        //             BranchCode = t.BranchCode,
+
+        //         })
+        //         .ToListAsync();
+
+        //     return new PagedResult<AllTransaction>
+        //     {
+        //         Items = items,
+        //         TotalItems = totalCount,
+        //         Page = filter.Page,
+        //         PageSize = filter.PageSize
+        //     };
+        // }
+
+
         public async Task<DashboardSummaryDto> GetDashboardSummaryAsync()
         {
             var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
             var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+
             // จำนวนสมาชิกทั้งหมด, active, inactive
             var totalMembers = await _context.Users.CountAsync();
 
@@ -665,12 +783,12 @@ namespace backend.Services
                 .Where(t => t.TransactionType == "Redeem")
                 .SumAsync(t => (int?)t.Points) ?? 0;
 
-            // **เพิ่ม - จำนวน like ทั้งหมดในระบบ (นับเฉพาะที่ IsLike == true)**
+            // จำนวน like ทั้งหมดในระบบ (นับเฉพาะที่ IsLike == true)
             var totalLikes = await _context.FeedLikes
                 .Where(fl => fl.IsLike == true)
                 .CountAsync();
 
-            // **เพิ่ม - top 3 feed ที่ถูกกด like เยอะที่สุด**
+            // top 3 feed ที่ถูกกด like เยอะที่สุด
             var top3Feeds = await _context.FeedLikes
                 .Where(fl => fl.IsLike == true)
                 .GroupBy(fl => fl.FeedId)
@@ -691,9 +809,55 @@ namespace backend.Services
                           LikeCount = fl.LikeCount
                       })
                 .ToListAsync();
+
+            // นับเพศ
             var maleCount = await _context.Users.CountAsync(u => u.Gender == "Male");
             var femaleCount = await _context.Users.CountAsync(u => u.Gender == "Female");
             var otherCount = await _context.Users.CountAsync(u => u.Gender != "Male" && u.Gender != "Female");
+            // คำนวณอายุ: เฉลี่ย, น้อยสุด, มากสุด (เฉพาะที่มีวันเกิด)
+            var ageStats = await _context.Users
+                .Where(u => u.BirthDate.HasValue)
+                .Select(u => new
+                {
+                    Age = now.Year - u.BirthDate.Value.Year -
+                          (now < u.BirthDate.Value.AddYears(now.Year - u.BirthDate.Value.Year) ? 1 : 0)
+                })
+                .Where(a => a.Age > 10)
+                .ToListAsync();
+
+            var minAge = ageStats.Any() ? ageStats.Min(a => a.Age) : 0;
+            var maxAge = ageStats.Any() ? ageStats.Max(a => a.Age) : 0;
+            var avgAge = ageStats.Any() ? (int)Math.Round(ageStats.Average(a => a.Age)) : 0;
+
+
+            // เพิ่มข้อมูลสมาชิกใหม่รายเดือนย้อนหลัง 12 เดือน (รวมเดือนปัจจุบัน)
+            var startDate = new DateTime(now.Year, now.Month, 1).AddMonths(-11);
+
+            var monthlyNewUsersRaw = await _context.Users
+                .Where(u => u.CreatedAt >= startDate)
+                .GroupBy(u => new { u.CreatedAt.Year, u.CreatedAt.Month })
+                .Select(g => new MonthlyNewUserDto
+                {
+                    Year = g.Key.Year,
+                    Month = g.Key.Month,
+                    Count = g.Count()
+                })
+                .ToListAsync();
+
+            var monthlyNewUsers = new List<MonthlyNewUserDto>();
+            for (int i = 0; i < 12; i++)
+            {
+                var targetDate = startDate.AddMonths(i);
+                var record = monthlyNewUsersRaw.FirstOrDefault(x => x.Year == targetDate.Year && x.Month == targetDate.Month);
+
+                monthlyNewUsers.Add(new MonthlyNewUserDto
+                {
+                    Year = targetDate.Year,
+                    Month = targetDate.Month,
+                    Count = record?.Count ?? 0
+                });
+            }
+
             return new DashboardSummaryDto
             {
                 Members = new MemberSummaryDto
@@ -701,6 +865,9 @@ namespace backend.Services
                     Total = totalMembers,
                     Active = activeMembers,
                     Inactive = inactiveMembers,
+                    MinAge = minAge,
+                    MaxAge = maxAge,
+                    AverageAge = avgAge
                 },
                 GenderSummary = new GenderSummaryDto
                 {
@@ -722,7 +889,8 @@ namespace backend.Services
                 {
                     TotalLikes = totalLikes,
                     Top3LikedFeeds = top3Feeds
-                }
+                },
+                MonthlyNewUsers = monthlyNewUsers  // ส่งข้อมูลรายเดือน
             };
         }
         public async Task<Category> CreateCategoryAsync(CreateCategoryRequest request)
@@ -744,39 +912,100 @@ namespace backend.Services
         }
 
 
-
-        // LoginAsync
         public async Task<AdminLoginResponse> LoginAsync(AdminLoginRequest request)
-{
-    var user = await _context.User_Admin
-        .FirstOrDefaultAsync(u => u.Username == request.Username);
+        {
+            var user = await _context.User_Admin
+                .FirstOrDefaultAsync(u => u.Username == request.Username);
 
-    if (user == null)
-        throw new UnauthorizedAccessException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+            if (user == null)
+                throw new UnauthorizedAccessException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
 
-    // ลองตรวจสอบแบบ plain text (ไม่แนะนำใช้จริงใน production)
-    if ((request.Password?.Trim() ?? "") != user.PasswordHash)
-        throw new UnauthorizedAccessException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
+            if ((request.Password?.Trim() ?? "") != user.PasswordHash)
+                throw new UnauthorizedAccessException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
 
-    var token = _lineLoginService.GenerateJwtToken(user.UserId, user.Username);
+            var token = _lineLoginService.GenerateJwtToken(user.UserId, user.Username, user.Role);
 
-    return new AdminLoginResponse
-    {
-        Token = token,
-        UserId = user.UserId,
-        Username = user.Username,
-        FullName = user.Name
-    };
-}
+            return new AdminLoginResponse
+            {
+                Token = token,
+                UserId = user.UserId,
+                Username = user.Username,
+                FullName = user.Name
+            };
+        }
+        public async Task<UserRedeemResultDto> GetUsersByRewardAsync(Guid rewardId, int page, int pageSize, string? phoneNumber, bool? isUsed = null, string? couponCode = null)
+        {
+            var query = _context.RedeemedRewards
+                .Where(r => r.RewardId == rewardId)
+                .Include(r => r.User)
+                .AsQueryable();
 
+            if (!string.IsNullOrWhiteSpace(phoneNumber))
+            {
+                query = query.Where(r => r.User.PhoneNumber.Contains(phoneNumber));
+            }
+            if (!string.IsNullOrWhiteSpace(couponCode))
+            {
+                query = query.Where(r => r.CouponCode.Contains(couponCode));
+            }
+            if (isUsed.HasValue)
+            {
+                query = query.Where(f => f.IsUsed == isUsed.Value);
+            }
+            var totalCount = await query.CountAsync();
+            var usedCount = await query.CountAsync(r => r.IsUsed);
 
+            var items = await query
+                .OrderByDescending(r => r.RedeemedDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new UserRedeemInfoDto
+                {
+                    UserId = r.UserId,
+                    FirstName = r.User.FirstName,
+                    LastName = r.User.LastName,
+                    PhoneNumber = r.User.PhoneNumber,
+                    RedeemedDate = r.RedeemedDate,
+                    IsUsed = r.IsUsed,
+                    UsedDate = r.UsedDate,
+                    CouponCode = r.CouponCode,
+                    UsedAt = r.UsedAt,
+                })
+                .ToListAsync();
+
+            return new UserRedeemResultDto
+            {
+                Paged = new PagedResult<UserRedeemInfoDto>
+                {
+                    Items = items,
+                    TotalItems = totalCount,
+                    Page = page,
+                    PageSize = pageSize
+                },
+                UsedCount = usedCount
+            };
+        }
+
+        public async Task<bool> RevertCouponUsageAsync(string couponCode)
+        {
+            var rr = await _context.RedeemedRewards
+                .FirstOrDefaultAsync(r => r.CouponCode == couponCode && r.IsUsed);
+
+            if (rr == null)
+                return false;
+
+            rr.IsUsed = false;
+            rr.UsedDate = null;
+            rr.UsedAt = null;
+            rr.RewardStatus = null;
+            rr.RewardComment = null;
+
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
 
 
     }
-
-
-
-
-
 }
 

@@ -51,13 +51,14 @@ namespace backend.Service.Interfaces
                 DateTime? startDate,
                 DateTime? endDate
             );
+
         Task<DashboardSummaryDto> GetDashboardSummaryAsync();
         Task<Category> CreateCategoryAsync(CreateCategoryRequest request);
         Task<List<Category>> GetAllCategoriesAsync();
         Task<string> GenerateUniqueRewardCodeAsync(string prefix);
         Task<AdminLoginResponse> LoginAsync(AdminLoginRequest request);
-
-
+        Task<UserRedeemResultDto> GetUsersByRewardAsync(Guid rewardId, int page, int pageSize, string? phoneNumber, bool? isUsed = null, string? couponCode = null);
+        Task<bool> RevertCouponUsageAsync(string couponCode);
 
 
 

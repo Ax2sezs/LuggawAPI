@@ -82,7 +82,7 @@ namespace backend.Service
         }
 
 
-        public async Task<bool> SyncRedeemPointToPosAsync(string phoneNumber, double points)
+        public async Task<PosRedeemResponse> SyncRedeemPointToPosAsync(string phoneNumber, double points)
         {
             var payload = new
             {
@@ -104,28 +104,25 @@ namespace backend.Service
 
             try
             {
-                Console.WriteLine("📤 JSON ส่งไป POS (Redeem):");
-                Console.WriteLine(json);
-                Console.WriteLine($"➡️ URL: {url}");
-
                 var response = await _httpClient.SendAsync(request);
                 var content = await response.Content.ReadAsStringAsync();
 
                 if (response.IsSuccessStatusCode)
                 {
+                    var posResponse = JsonSerializer.Deserialize<PosRedeemResponse>(content);
                     Console.WriteLine("✅ POS Redeem Sync Success: " + content);
-                    return true;
+                    return posResponse;
                 }
                 else
                 {
                     Console.WriteLine("❌ POS Redeem Sync Failed: " + content);
-                    return false;
+                    return new PosRedeemResponse { isSuccess = false, data = content };
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine("❗ POS Redeem Sync Exception: " + ex.Message);
-                return false;
+                return new PosRedeemResponse { isSuccess = false, data = ex.Message };
             }
         }
 
