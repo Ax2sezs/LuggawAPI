@@ -1,4 +1,6 @@
-﻿namespace backend.Models
+﻿// Models.cs หรือไฟล์ที่เก็บ DTO
+
+namespace backend.Models
 {
     public class DashboardSummaryDto
     {
@@ -6,8 +8,8 @@
         public GenderSummaryDto GenderSummary { get; set; }
         public RewardSummaryDto Rewards { get; set; }
         public PointSummaryDto Points { get; set; }
-        public LikeSummaryDto Likes { get; set; }   // เพิ่ม
-
+        public LikeSummaryDto Likes { get; set; }
+        public List<MonthlyNewUserDto> MonthlyNewUsers { get; set; }  // เพิ่ม
     }
 
     public class MemberSummaryDto
@@ -15,18 +17,16 @@
         public int Total { get; set; }
         public int Active { get; set; }
         public int Inactive { get; set; }
+
+        public int MinAge { get; set; }
+        public int MaxAge { get; set; }
+        public int AverageAge { get; set; }
     }
     public class GenderSummaryDto
     {
         public int Male { get; set; }
         public int Female { get; set; }
-        public int Other { get; set; } // optional, เผื่อมีค่าอื่นๆ หรือไม่ระบุ
-    }
-
-    public class TierCountDto
-    {
-        public string Tier { get; set; }
-        public int Count { get; set; }
+        public int Other { get; set; }
     }
 
     public class RewardSummaryDto
@@ -61,4 +61,10 @@
         public int LikeCount { get; set; }
     }
 
+    public class MonthlyNewUserDto  // เพิ่ม
+    {
+        public int Year { get; set; }
+        public int Month { get; set; }
+        public int Count { get; set; }
+    }
 }

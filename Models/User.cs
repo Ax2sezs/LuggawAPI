@@ -5,8 +5,10 @@
         public Guid UserId { get; set; } = Guid.NewGuid();  // เปลี่ยนจาก int เป็น Guid และกำหนด default ให้สร้าง Guid ใหม่
         public string LineUserId { get; set; }
         public string DisplayName { get; set; }
-        public string PictureUrl { get; set; }
-        public DateTime CreatedAt { get; set; } = DateTime.Now;
+        public string? PictureUrl { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public string? FirstName { get; set; }
+        public string? LastName { get; set; }
 
         public string? PhoneNumber { get; set; }
         public DateTime? BirthDate { get; set; }

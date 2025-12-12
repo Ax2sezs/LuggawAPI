@@ -11,6 +11,9 @@
         public string GetPointHistory { get; set; } = "";
         public string GetBalance { get; set; } = "";
         public string RedeemByApp { get; set; } = "";
+        public string ChangePhoneNumber { get; set; } = "";
+        public string Register { get; set; } = "";
+        public string EditProfile { get; set; } = "";
     }
 
     public class PosApiSettings

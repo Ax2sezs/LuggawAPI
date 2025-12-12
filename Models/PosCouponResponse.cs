@@ -7,6 +7,7 @@
         public int rw_member_id { get; set; }
         public Guid mem_guid { get; set; }
         public string rw_rewardstatus { get; set; }
+        public string orderno { get; set; }
         public string mem_number { get; set; }
         public string mem_firstname { get; set; }
         public string mem_lastname { get; set; }

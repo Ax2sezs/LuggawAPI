@@ -1,6 +1,8 @@
 ﻿using backend.Models;
 using backend.Service.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace backend.Controllers
 {
@@ -15,11 +17,16 @@ namespace backend.Controllers
             _rewardService = rewardService;
         }
 
-       
 
-        [HttpGet("available/{userId}")]
-        public async Task<ActionResult<IEnumerable<Rewards>>> GetAvailableRewards(Guid userId)
+        [Authorize]
+        [HttpGet("available")]
+        public async Task<ActionResult<IEnumerable<Rewards>>> GetAvailableRewards()
         {
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(new { message = "Invalid user token" });
+            }
             try
             {
                 var rewards = await _rewardService.GetAvailableRewardsAsync(userId);

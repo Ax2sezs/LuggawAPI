@@ -62,9 +62,9 @@ public class PosController : ControllerBase
 
     // ใช้คูปอง
     [HttpPut("use/{couponCode}")]
-    public async Task<IActionResult> UseCoupon([FromRoute] string couponCode)
+    public async Task<IActionResult> UseCoupon([FromRoute] string couponCode, [FromBody] UseCouponDto dto)
     {
-        var success = await _posService.MarkCouponAsUsedAsync(couponCode);
+        var success = await _posService.MarkCouponAsUsedAsync(couponCode, dto.orderno, dto.rw_reward_status, dto.rw_comment);
         if (!success)
         {
             return BadRequest(new

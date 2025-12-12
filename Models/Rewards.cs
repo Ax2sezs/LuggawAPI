@@ -19,12 +19,16 @@ namespace backend.Models
         public string? ImageUrl { get; set; }
 
         public DateTime StartDate { get; set; }
-        public DateTime EndDate { get; set; } 
+        public DateTime EndDate { get; set; }
         public string? CouponCode { get; set; }
         public bool IsActive { get; set; }
         public DateTime? UpdateAt { get; set; }
         public int CategoryId { get; set; }
         public RewardType RewardType { get; set; }
+        public string DiscountMax { get; set; }
+        public string DiscountMin { get; set; }
+        public string DiscountPercent { get; set; }
+        public string DiscountType { get; set; }
 
         // ✅ Navigation Property
         [ForeignKey("CategoryId")]

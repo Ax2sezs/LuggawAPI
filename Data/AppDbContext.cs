@@ -16,6 +16,8 @@ public class AppDbContext : DbContext
     public DbSet<FeedLike> FeedLikes { get; set; }
     public DbSet<Category> Category { get; set; }
     public DbSet<User_Admin> User_Admin { get; set; }
+    public DbSet<PhoneNumber> PhoneNumbers { get; set; }
+    public DbSet<OtpRequest> OtpRequests { get; set; }
 
     //public DbSet<RewardImages> RewardImages { get; set; }
 
@@ -54,8 +56,10 @@ public class AppDbContext : DbContext
         .HasKey(r => r.RewardId);
 
         modelBuilder.Entity<RedeemedReward>()
-           .HasIndex(u => u.RedeemedRewardId)
-           .IsUnique();
+        .HasIndex(r => new { r.UserId, r.RewardId })
+        .IsUnique()
+        .HasFilter("[RewardType] <> 0"); // สำหรับ SQL Server
+
         modelBuilder.Entity<UserLog>(entity =>
         {
             entity.HasKey(e => e.LogId);
@@ -87,6 +91,15 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<PointTransaction>()
        .HasKey(pt => pt.TransactionId);   // เพิ่มบรรทัดนี้
+        modelBuilder.Entity<PhoneNumber>()
+     .HasIndex(p => p.Phone_Number)
+     .IsUnique();
+
+        modelBuilder.Entity<PhoneNumber>()
+            .HasOne(p => p.User)
+            .WithMany()
+            .HasForeignKey(p => p.UserId);
+
 
 
         base.OnModelCreating(modelBuilder);

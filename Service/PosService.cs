@@ -82,33 +82,93 @@ public class PosService : IPosService
         };
     }
 
-public async Task<bool> MarkCouponAsUsedAsync(string couponCode, string orderNo, string rewardStatus, string rewardComment)
+    // public async Task<bool> MarkCouponAsUsedAsync(string couponCode, string orderNo, string rewardStatus, string rewardComment)
+    //     {
+    //         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+    //         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+    //         var rr = await _context.RedeemedRewards
+    //             .FirstOrDefaultAsync(r => r.CouponCode == couponCode && !r.IsUsed);
+
+    //         if (rr == null) return false;
+
+    //         rr.IsUsed = true;
+    //         rr.UsedDate = now;
+    //         rr.UsedAt = orderNo;
+    //         rr.RewardStatus = rewardStatus;
+    //         rr.RewardComment = rewardComment;
+    //         await _context.SaveChangesAsync();
+
+    //         await _hubContext.Clients.User(rr.UserId.ToString())
+    //             .SendAsync("CouponUsed", new
+    //             {
+    //                 CouponCode = couponCode,
+    //                 UsedDate = now,
+    //                 UserId = rr.UserId,
+    //                 CouponId = rr.RedeemedRewardId
+    //             });
+
+    //         return true;
+    //     }
+    public async Task<bool> MarkCouponAsUsedAsync(
+     string couponCode,
+     string orderNo,
+     string rewardStatus,
+     string rewardComment
+ )
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
         var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+
         var rr = await _context.RedeemedRewards
-            .FirstOrDefaultAsync(r => r.CouponCode == couponCode && !r.IsUsed);
+            .FirstOrDefaultAsync(r => r.CouponCode == couponCode);
 
-        if (rr == null) return false;
+        if (rr == null)
+            return false;
 
-        rr.IsUsed = true;
-        rr.UsedDate = now;
-        rr.UsedAt = orderNo;
-        rr.RewardStatus = rewardStatus;
-        rr.RewardComment = rewardComment;
-        await _context.SaveChangesAsync();
+        // ใช้คูปอง
+        if (!rr.IsUsed)
+        {
+            rr.IsUsed = true;
+            rr.UsedDate = now;
+            rr.UsedAt = orderNo;
+            rr.RewardStatus = rewardStatus; // บันทึกค่า POS ส่งมา
+            rr.RewardComment = rewardComment;
 
-        await _hubContext.Clients.User(rr.UserId.ToString())
-            .SendAsync("CouponUsed", new
-            {
-                CouponCode = couponCode,
-                UsedDate = now,
-                UserId = rr.UserId,
-                CouponId = rr.RedeemedRewardId
-            });
+            await _context.SaveChangesAsync();
+
+            await _hubContext.Clients.User(rr.UserId.ToString())
+                .SendAsync("CouponUsed", new
+                {
+                    CouponCode = couponCode,
+                    UsedDate = now,
+                    UserId = rr.UserId,
+                    CouponId = rr.RedeemedRewardId
+                });
+        }
+        else if (rr.IsUsed && rewardStatus == "N")
+        {
+            rr.IsUsed = false;
+            rr.UsedDate = null;
+            rr.UsedAt = null;
+            rr.RewardStatus = null;
+            rr.RewardComment = null;
+
+            await _context.SaveChangesAsync();
+
+            await _hubContext.Clients.User(rr.UserId.ToString())
+                .SendAsync("CouponReverted", new
+                {
+                    CouponCode = couponCode,
+                    UserId = rr.UserId,
+                    CouponId = rr.RedeemedRewardId
+                });
+        }
 
         return true;
     }
+
+
+
 
 
 

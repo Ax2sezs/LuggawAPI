@@ -19,38 +19,37 @@ namespace backend.Controllers
             _adminService = adminService;
         }
 
-     [HttpPost("login")]
-public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
-{
-    try
-    {
-        var response = await _adminService.LoginAsync(request);
-        return Ok(response);
-    }
-    catch (UnauthorizedAccessException ex)
-    {
-        return Unauthorized(new { message = ex.Message });
-    }
-    catch (Exception ex)
-    {
-        // เพิ่ม log error ที่นี่
-        Console.WriteLine($"Login error: {ex}");
-        return StatusCode(500, new { message = ex.Message, stackTrace = ex.StackTrace });
-    }
-}
-
-
-        [Authorize]
-        [HttpGet("summary")]
-            public async Task<IActionResult> GetSummary()
+        [HttpPost("login")]
+        public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
+        {
+            try
             {
-                var result = await _adminService.GetDashboardSummaryAsync();
-                return Ok(result);
+                var response = await _adminService.LoginAsync(request);
+                return Ok(response);
             }
-        
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                // เพิ่ม log error ที่นี่
+                Console.WriteLine($"Login error: {ex}");
+                return StatusCode(500, new { message = ex.Message, stackTrace = ex.StackTrace });
+            }
+        }
+
+        [Authorize(Roles = "Admin,SuperAdmin")]
+        [HttpGet("summary")]
+        public async Task<IActionResult> GetSummary()
+        {
+            var result = await _adminService.GetDashboardSummaryAsync();
+            return Ok(result);
+        }
 
 
-        // GET api/admin/users?page=1&pageSize=10
+
+        [Authorize(Roles = "SuperAdmin")]
         [HttpGet("all-user")]
         public async Task<IActionResult> GetAllUsers(
         [FromQuery] int page = 1,
@@ -64,8 +63,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             var users = await _adminService.GetAllUsersAsync(page, pageSize, searchTerm, isActive, createdAfter, createdBefore);
             return Ok(users);
         }
-
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpGet("get-all-transaction")]
         public async Task<IActionResult> GetAllTransactions(
      int page = 1,
@@ -85,8 +83,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             return Ok(result);
         }
 
-
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpPost("toggle-user-status")]
         public async Task<IActionResult> ToggleUserStatus([FromBody] ToggleRequest request)
         {
@@ -100,8 +97,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
-
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpPost("add-cate")]
         public async Task<IActionResult> CreateCategory([FromBody] CreateCategoryRequest request)
         {
@@ -115,16 +111,14 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
                 return BadRequest(ex.Message);
             }
         }
-
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpGet("get-category")]
         public async Task<IActionResult> GetAll()
         {
             var categories = await _adminService.GetAllCategoriesAsync();
             return Ok(categories);
         }
-
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpGet("generate-code")]
         public async Task<IActionResult> GenerateCode([FromQuery] string prefix)
         {
@@ -141,8 +135,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
                 return BadRequest(ex.Message);
             }
         }
-
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpPost("create")]
         public async Task<IActionResult> CreateReward([FromForm] CreateRewardRequest request)
         {
@@ -159,8 +152,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
                 return StatusCode(500, new { error = ex.Message });
             }
         }
-
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpPut("update-reward/{rewardId}")]
         public async Task<IActionResult> UpdateReward(Guid rewardId, [FromForm] UpdateReward updateDto, IFormFile? imageFile)
         {
@@ -170,8 +162,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             return Ok(); // หรือ Ok() ถ้าอยากส่งข้อมูลกลับ
         }
 
-
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpPatch("rewards/{rewardId}/toggle-active")]
         public async Task<IActionResult> ToggleRewardStatus(Guid rewardId)
         {
@@ -183,8 +174,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
         }
 
 
-
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpGet("rewards")]
         public async Task<IActionResult> GetAllRewards(
      int page = 1,
@@ -202,8 +192,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             );
             return Ok(result);
         }
-
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpGet("reward/{rewardId}")]
         public async Task<IActionResult> GetRewardById(Guid rewardId)
         {
@@ -213,8 +202,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
 
             return Ok(reward);
         }
-
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpPost("create-feed")]
         public async Task<IActionResult> CreateFeed([FromForm] CreateFeedRequest request)
         {
@@ -222,8 +210,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             return Ok(feed);
         }
 
-
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpPut("update-feed/{id}")]
         public async Task<IActionResult> UpdateFeed(Guid id, [FromForm] UpdateFeedRequest request)
         {
@@ -231,8 +218,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             if (updatedFeed == null) return NotFound();
             return Ok(updatedFeed);
         }
-
-        [Authorize]
+        [Authorize(Roles = "Admin")]
         [HttpPatch("{feedId}/toggle-active")]
         public async Task<IActionResult> ToggleFeedActive(Guid feedId)
         {
@@ -242,7 +228,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             return Ok(new { isActive = newStatus });
         }
 
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpDelete("images/{imageId}")]
         public async Task<IActionResult> DeleteImage(int imageId)
         {
@@ -253,7 +239,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             return Ok();
         }
 
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpGet("get-all-feed")]
         public async Task<IActionResult> GetFeeds(
     [FromQuery] int pageNumber = 1,
@@ -274,7 +260,7 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             return Ok(pagedFeeds);
         }
 
-        [Authorize]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpGet("get-feed-by/{id}")]
         public async Task<IActionResult> GetFeedById(Guid id)
         {
@@ -282,6 +268,41 @@ public async Task<IActionResult> Login([FromBody] AdminLoginRequest request)
             if (feed == null) return NotFound();
             return Ok(feed);
         }
+        [Authorize(Roles = "SuperAdmin")]
+        [HttpGet("reward/{rewardId}/users")]
+        public async Task<ActionResult<UserRedeemResultDto>> GetUsersByReward(
+        Guid rewardId,
+        int page = 1,
+        int pageSize = 20,
+        string? phoneNumber = null,
+        bool? isUsed = null,
+        string? couponCode = null)
+        {
+            var result = await _adminService.GetUsersByRewardAsync(rewardId, page, pageSize, phoneNumber, isUsed, couponCode);
+            return Ok(result);
+        }
+        [Authorize(Roles = "SuperAdmin")]
+        [HttpPatch("coupon/revert/{couponCode}")]
+        public async Task<IActionResult> RevertCoupon([FromRoute] string couponCode)
+        {
+            var success = await _adminService.RevertCouponUsageAsync(couponCode);
+
+            if (!success)
+            {
+                return BadRequest(new
+                {
+                    isSuccess = false,
+                    message = "Coupon invalid or not used yet"
+                });
+            }
+
+            return Ok(new
+            {
+                isSuccess = true,
+                message = "Coupon reverted successfully"
+            });
+        }
+
         //// PUT api/admin/users/{id}/toggle-status
         //[HttpPut("{id}/toggle-status")]
         //public async Task<IActionResult> ToggleUserStatus(Guid id)

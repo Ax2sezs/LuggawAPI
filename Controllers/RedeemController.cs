@@ -14,6 +14,7 @@ public class RedeemController : ControllerBase
     {
         _redeemService = redeemService;
     }
+    [Authorize]
     [HttpPost("redeem")]
     public async Task<IActionResult> Redeem([FromBody] RedeemRequest request)
     {

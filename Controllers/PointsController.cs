@@ -62,7 +62,7 @@ namespace backend.Controllers
         {
             try
             {
-                await _pointService.EarnPointsAsync(request.PhoneNumber, request.Points, request.Description);
+                await _pointService.EarnPointsAsync(request);
                 return Ok(new { message = "Points earned successfully" });
             }
             catch (Exception ex)
