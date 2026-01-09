@@ -19,6 +19,7 @@
         public bool? IsCompleted { get; set; }
         public string? MemberNumber { get; set; }
         public bool? IsAdmin { get; set; }
+        public bool? IsAllow {get;set;}
 
         public UserPoints UserPoint { get; set; }
 

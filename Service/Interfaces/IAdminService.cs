@@ -11,7 +11,9 @@ namespace backend.Service.Interfaces
                 bool? isActive = null,
                 DateTime? createdAfter = null,
                 DateTime? createdBefore = null
-            ); Task ToggleUserStatusAsync(ToggleRequest request);
+            ); 
+        Task ToggleUserStatusAsync(ToggleRequest request);
+        Task ToggleUserPolicyAsync(Guid userId);
         Task CreateRewardAsync(CreateRewardRequest request);
         Task<PagedResult<Rewards>> GetAllRewardsAsync(
                 int page,

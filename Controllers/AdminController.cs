@@ -13,7 +13,6 @@ namespace backend.Controllers
     {
         private readonly IAdminService _adminService;
 
-
         public AdminController(IAdminService adminService)
         {
             _adminService = adminService;
@@ -47,37 +46,50 @@ namespace backend.Controllers
             return Ok(result);
         }
 
-
-
         [Authorize(Roles = "SuperAdmin")]
         [HttpGet("all-user")]
         public async Task<IActionResult> GetAllUsers(
-        [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 10,
-        [FromQuery] string? searchTerm = null,
-        [FromQuery] bool? isActive = null,
-        [FromQuery] DateTime? createdAfter = null,
-        [FromQuery] DateTime? createdBefore = null
-    )
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? searchTerm = null,
+            [FromQuery] bool? isActive = null,
+            [FromQuery] DateTime? createdAfter = null,
+            [FromQuery] DateTime? createdBefore = null
+        )
         {
-            var users = await _adminService.GetAllUsersAsync(page, pageSize, searchTerm, isActive, createdAfter, createdBefore);
+            var users = await _adminService.GetAllUsersAsync(
+                page,
+                pageSize,
+                searchTerm,
+                isActive,
+                createdAfter,
+                createdBefore
+            );
             return Ok(users);
         }
+
         [Authorize(Roles = "SuperAdmin")]
         [HttpGet("get-all-transaction")]
         public async Task<IActionResult> GetAllTransactions(
-     int page = 1,
-     int pageSize = 20,
-     string? search = null,
-     string? transactionType = null,
-     string? rewardName = null,
-     string? phoneNumber = null,
-     DateTime? startDate = null,
-     DateTime? endDate = null
- )
+            int page = 1,
+            int pageSize = 20,
+            string? search = null,
+            string? transactionType = null,
+            string? rewardName = null,
+            string? phoneNumber = null,
+            DateTime? startDate = null,
+            DateTime? endDate = null
+        )
         {
             var result = await _adminService.GetAllTransactionsAsync(
-                page, pageSize, search, transactionType, rewardName, phoneNumber, startDate, endDate
+                page,
+                pageSize,
+                search,
+                transactionType,
+                rewardName,
+                phoneNumber,
+                startDate,
+                endDate
             );
 
             return Ok(result);
@@ -97,6 +109,22 @@ namespace backend.Controllers
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
+
+        [Authorize(Roles = "SuperAdmin")]
+        [HttpPatch("toggle-user-policy/{userId}")]
+        public async Task<IActionResult> ToggleUserPolicy(Guid userId)
+        {
+            try
+            {
+                await _adminService.ToggleUserPolicyAsync(userId);
+                return Ok(new { success = true, message = "User Policy updated." });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
         [Authorize(Roles = "SuperAdmin")]
         [HttpPost("add-cate")]
         public async Task<IActionResult> CreateCategory([FromBody] CreateCategoryRequest request)
@@ -111,6 +139,7 @@ namespace backend.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
         [Authorize(Roles = "SuperAdmin")]
         [HttpGet("get-category")]
         public async Task<IActionResult> GetAll()
@@ -118,6 +147,7 @@ namespace backend.Controllers
             var categories = await _adminService.GetAllCategoriesAsync();
             return Ok(categories);
         }
+
         [Authorize(Roles = "Admin")]
         [HttpGet("generate-code")]
         public async Task<IActionResult> GenerateCode([FromQuery] string prefix)
@@ -135,6 +165,7 @@ namespace backend.Controllers
                 return BadRequest(ex.Message);
             }
         }
+
         [Authorize(Roles = "SuperAdmin")]
         [HttpPost("create")]
         public async Task<IActionResult> CreateReward([FromForm] CreateRewardRequest request)
@@ -152,12 +183,22 @@ namespace backend.Controllers
                 return StatusCode(500, new { error = ex.Message });
             }
         }
+
         [Authorize(Roles = "SuperAdmin")]
         [HttpPut("update-reward/{rewardId}")]
-        public async Task<IActionResult> UpdateReward(Guid rewardId, [FromForm] UpdateReward updateDto, IFormFile? imageFile)
+        public async Task<IActionResult> UpdateReward(
+            Guid rewardId,
+            [FromForm] UpdateReward updateDto,
+            IFormFile? imageFile
+        )
         {
-            var result = await _adminService.UpdateRewardWithImageAsync(rewardId, updateDto, imageFile);
-            if (!result) return NotFound();
+            var result = await _adminService.UpdateRewardWithImageAsync(
+                rewardId,
+                updateDto,
+                imageFile
+            );
+            if (!result)
+                return NotFound();
 
             return Ok(); // หรือ Ok() ถ้าอยากส่งข้อมูลกลับ
         }
@@ -173,25 +214,32 @@ namespace backend.Controllers
             return Ok(new { isActive = result });
         }
 
-
         [Authorize(Roles = "SuperAdmin")]
         [HttpGet("rewards")]
         public async Task<IActionResult> GetAllRewards(
-     int page = 1,
-     int pageSize = 10,
-     string? search = null,
-     DateTime? startDate = null,
-     DateTime? endDate = null,
-     bool? isActive = null,
-     int? minPoints = null,
-     int? maxPoints = null
- )
+            int page = 1,
+            int pageSize = 10,
+            string? search = null,
+            DateTime? startDate = null,
+            DateTime? endDate = null,
+            bool? isActive = null,
+            int? minPoints = null,
+            int? maxPoints = null
+        )
         {
             var result = await _adminService.GetAllRewardsAsync(
-                page, pageSize, search, startDate, endDate, isActive, minPoints, maxPoints
+                page,
+                pageSize,
+                search,
+                startDate,
+                endDate,
+                isActive,
+                minPoints,
+                maxPoints
             );
             return Ok(result);
         }
+
         [Authorize(Roles = "SuperAdmin")]
         [HttpGet("reward/{rewardId}")]
         public async Task<IActionResult> GetRewardById(Guid rewardId)
@@ -202,6 +250,7 @@ namespace backend.Controllers
 
             return Ok(reward);
         }
+
         [Authorize(Roles = "Admin")]
         [HttpPost("create-feed")]
         public async Task<IActionResult> CreateFeed([FromForm] CreateFeedRequest request)
@@ -215,15 +264,18 @@ namespace backend.Controllers
         public async Task<IActionResult> UpdateFeed(Guid id, [FromForm] UpdateFeedRequest request)
         {
             var updatedFeed = await _adminService.UpdateFeedAsync(id, request);
-            if (updatedFeed == null) return NotFound();
+            if (updatedFeed == null)
+                return NotFound();
             return Ok(updatedFeed);
         }
+
         [Authorize(Roles = "Admin")]
         [HttpPatch("{feedId}/toggle-active")]
         public async Task<IActionResult> ToggleFeedActive(Guid feedId)
         {
             var newStatus = await _adminService.ToggleFeedIsActiveAsync(feedId);
-            if (newStatus == null) return NotFound(new { message = "Feed not found" });
+            if (newStatus == null)
+                return NotFound(new { message = "Feed not found" });
 
             return Ok(new { isActive = newStatus });
         }
@@ -242,12 +294,13 @@ namespace backend.Controllers
         [Authorize(Roles = "SuperAdmin")]
         [HttpGet("get-all-feed")]
         public async Task<IActionResult> GetFeeds(
-    [FromQuery] int pageNumber = 1,
-    [FromQuery] int pageSize = 10,
-    [FromQuery] string? search = null,
-    [FromQuery] bool? isActive = null,
-    [FromQuery] DateTime? startDate = null,
-    [FromQuery] DateTime? endDate = null)
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? search = null,
+            [FromQuery] bool? isActive = null,
+            [FromQuery] DateTime? startDate = null,
+            [FromQuery] DateTime? endDate = null
+        )
         {
             var pagedFeeds = await _adminService.GetFeedsPagedAsync(
                 pageNumber,
@@ -255,7 +308,8 @@ namespace backend.Controllers
                 search,
                 isActive,
                 startDate,
-                endDate);
+                endDate
+            );
 
             return Ok(pagedFeeds);
         }
@@ -265,22 +319,33 @@ namespace backend.Controllers
         public async Task<IActionResult> GetFeedById(Guid id)
         {
             var feed = await _adminService.GetFeedByIdAsync(id);
-            if (feed == null) return NotFound();
+            if (feed == null)
+                return NotFound();
             return Ok(feed);
         }
+
         [Authorize(Roles = "SuperAdmin")]
         [HttpGet("reward/{rewardId}/users")]
         public async Task<ActionResult<UserRedeemResultDto>> GetUsersByReward(
-        Guid rewardId,
-        int page = 1,
-        int pageSize = 20,
-        string? phoneNumber = null,
-        bool? isUsed = null,
-        string? couponCode = null)
+            Guid rewardId,
+            int page = 1,
+            int pageSize = 20,
+            string? phoneNumber = null,
+            bool? isUsed = null,
+            string? couponCode = null
+        )
         {
-            var result = await _adminService.GetUsersByRewardAsync(rewardId, page, pageSize, phoneNumber, isUsed, couponCode);
+            var result = await _adminService.GetUsersByRewardAsync(
+                rewardId,
+                page,
+                pageSize,
+                phoneNumber,
+                isUsed,
+                couponCode
+            );
             return Ok(result);
         }
+
         [Authorize(Roles = "SuperAdmin")]
         [HttpPatch("coupon/revert/{couponCode}")]
         public async Task<IActionResult> RevertCoupon([FromRoute] string couponCode)
@@ -289,18 +354,12 @@ namespace backend.Controllers
 
             if (!success)
             {
-                return BadRequest(new
-                {
-                    isSuccess = false,
-                    message = "Coupon invalid or not used yet"
-                });
+                return BadRequest(
+                    new { isSuccess = false, message = "Coupon invalid or not used yet" }
+                );
             }
 
-            return Ok(new
-            {
-                isSuccess = true,
-                message = "Coupon reverted successfully"
-            });
+            return Ok(new { isSuccess = true, message = "Coupon reverted successfully" });
         }
 
         //// PUT api/admin/users/{id}/toggle-status

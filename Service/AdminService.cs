@@ -1,18 +1,16 @@
-﻿
-using backend.Service.Interfaces;
-using LineLoginBackend.Data;
-using Microsoft.EntityFrameworkCore;
-using backend.Models;
-using System;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Options;
-using System.Text.Json;
-using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.IdentityModel.Tokens;
+﻿using System;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
-
+using System.Text.Json;
+using backend.Models;
+using backend.Service.Interfaces;
+using LineLoginBackend.Data;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 
 namespace backend.Services
 {
@@ -23,14 +21,19 @@ namespace backend.Services
         private readonly FileSettings _fileSettings;
         private readonly LineLoginService _lineLoginService; // ✅ ใช้ generate token
 
-
-        public AdminService(AppDbContext context, IWebHostEnvironment environment, IOptions<FileSettings> fileSettings, LineLoginService lineLoginService)
+        public AdminService(
+            AppDbContext context,
+            IWebHostEnvironment environment,
+            IOptions<FileSettings> fileSettings,
+            LineLoginService lineLoginService
+        )
         {
             _context = context;
             _environment = environment;
             _fileSettings = fileSettings.Value;
             _lineLoginService = lineLoginService;
         }
+
         private async Task<List<string>> SaveImages(List<IFormFile> images)
         {
             var imageUrls = new List<string>();
@@ -51,20 +54,21 @@ namespace backend.Services
         }
 
         public async Task<PagedResult<ShowAllUser>> GetAllUsersAsync(
-     int page,
-     int pageSize,
-     string? searchTerm = null,     // กรองโดยชื่อหรือเบอร์โทร
-     bool? isActive = null,         // กรองสถานะเปิดใช้งาน
-     DateTime? createdAfter = null, // กรองวันที่สมัครหลังจากนี้
-     DateTime? createdBefore = null // กรองวันที่สมัครก่อนหน้านี้
- )
+            int page,
+            int pageSize,
+            string? searchTerm = null, // กรองโดยชื่อหรือเบอร์โทร
+            bool? isActive = null, // กรองสถานะเปิดใช้งาน
+            DateTime? createdAfter = null, // กรองวันที่สมัครหลังจากนี้
+            DateTime? createdBefore = null // กรองวันที่สมัครก่อนหน้านี้
+        )
         {
             var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
             var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
 
-            var query = _context.Users
-            //     .Include(u => u.UserPoint)
-                 .AsNoTracking()
+            var query = _context
+                .Users
+                //     .Include(u => u.UserPoint)
+                .AsNoTracking()
                 .AsQueryable();
 
             // Filter: ค้นหาชื่อ (DisplayName) หรือเบอร์โทร (PhoneNumber) ถ้ามีค่า searchTerm
@@ -104,27 +108,39 @@ namespace backend.Services
                 .Take(pageSize)
                 .ToListAsync();
 
-            var users = userList.Select(u => new ShowAllUser
-            {
-                UserId = u.UserId,
-                FirstName = u.FirstName,
-                LastName = u.LastName,
-                CreatedAt = u.CreatedAt,
-                PhoneNumber = u.PhoneNumber,
-                BirthDate = u.BirthDate,
-                Gender = u.Gender,
-                IsActive = u.IsActive,
-                Age = u.BirthDate.HasValue
-                    ? (now.Year - u.BirthDate.Value.Year - (u.BirthDate.Value.Date > now.Date.AddYears(-(now.Year - u.BirthDate.Value.Year)) ? 1 : 0))
-                    : (int?)null
-            }).ToList();
+            var users = userList
+                .Select(u => new ShowAllUser
+                {
+                    UserId = u.UserId,
+                    FirstName = u.FirstName,
+                    LastName = u.LastName,
+                    CreatedAt = u.CreatedAt,
+                    PhoneNumber = u.PhoneNumber,
+                    BirthDate = u.BirthDate,
+                    Gender = u.Gender,
+                    IsActive = u.IsActive,
+                    IsAllow = u.IsAllow,
+                    Age = u.BirthDate.HasValue
+                        ? (
+                            now.Year
+                            - u.BirthDate.Value.Year
+                            - (
+                                u.BirthDate.Value.Date
+                                > now.Date.AddYears(-(now.Year - u.BirthDate.Value.Year))
+                                    ? 1
+                                    : 0
+                            )
+                        )
+                        : (int?)null,
+                })
+                .ToList();
 
             return new PagedResult<ShowAllUser>
             {
                 Items = users,
                 TotalItems = totalItems,
                 Page = page,
-                PageSize = pageSize
+                PageSize = pageSize,
             };
         }
 
@@ -142,33 +158,53 @@ namespace backend.Services
 
             await _context.SaveChangesAsync();
         }
+
+        public async Task ToggleUserPolicyAsync(Guid userId)
+        {
+            var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
+            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+                throw new Exception("User not found");
+
+            user.IsAllow = !user.IsAllow;
+            user.UpdateAt = now;
+
+            await _context.SaveChangesAsync();
+        }
+
         private string GenerateCouponCode()
         {
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             var random = new Random();
-            return new string(Enumerable.Repeat(chars, 16)
-                .Select(s => s[random.Next(s.Length)]).ToArray());
+            return new string(
+                Enumerable.Repeat(chars, 16).Select(s => s[random.Next(s.Length)]).ToArray()
+            );
         }
 
         public async Task<List<Category>> GetAllCategoriesAsync()
         {
             return await _context.Category.ToListAsync();
         }
+
         public async Task<string> GenerateUniqueRewardCodeAsync(string prefix)
         {
             if (string.IsNullOrWhiteSpace(prefix))
                 throw new ArgumentException("Prefix is required");
 
-            var latestCode = await _context.Rewards
-                .Where(r => r.CouponCode.StartsWith(prefix))
+            var latestCode = await _context
+                .Rewards.Where(r => r.CouponCode.StartsWith(prefix))
                 .OrderByDescending(r => r.CouponCode)
                 .Select(r => r.CouponCode)
                 .FirstOrDefaultAsync();
 
             int nextNumber = 1;
 
-            if (!string.IsNullOrEmpty(latestCode) &&
-                int.TryParse(latestCode.Substring(prefix.Length), out int currentNumber))
+            if (
+                !string.IsNullOrEmpty(latestCode)
+                && int.TryParse(latestCode.Substring(prefix.Length), out int currentNumber)
+            )
             {
                 nextNumber = currentNumber + 1;
             }
@@ -182,13 +218,15 @@ namespace backend.Services
             {
                 if (string.IsNullOrEmpty(request.RewardName))
                     throw new ArgumentException("RewardName is required");
-                var category = await _context.Category
-                .Where(c => c.Id == request.CategoryId)
-                .FirstOrDefaultAsync();
+                var category = await _context
+                    .Category.Where(c => c.Id == request.CategoryId)
+                    .FirstOrDefaultAsync();
 
                 var rewardId = Guid.NewGuid();
-                var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
-                        TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+                var now = TimeZoneInfo.ConvertTimeFromUtc(
+                    DateTime.UtcNow,
+                    TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")
+                );
 
                 // ✅ Generate RewardCode แบบไม่ซ้ำด้วย prefix จาก Category หรือ fixed prefix เช่น "RD"
                 // สมมติ prefix = "RD" (อาจดึงจาก CategoryId ก็ได้)
@@ -204,7 +242,7 @@ namespace backend.Services
                     CreatedAt = now,
                     StartDate = request.StartDate,
                     EndDate = request.EndDate,
-                    CouponCode = rewardCode,  // ใช้โค้ดที่ generate ใหม่
+                    CouponCode = rewardCode, // ใช้โค้ดที่ generate ใหม่
                     CategoryId = request.CategoryId,
                     IsActive = request.IsActive,
                     RewardType = request.RewardType,
@@ -212,7 +250,6 @@ namespace backend.Services
                     DiscountMin = request.DiscountMin,
                     DiscountPercent = request.DiscountPercent,
                     DiscountType = request.DiscountType,
-
                 };
 
                 if (request.Image != null && request.Image.Length > 0)
@@ -222,7 +259,8 @@ namespace backend.Services
                     if (!Directory.Exists(uploadsPath))
                         Directory.CreateDirectory(uploadsPath);
 
-                    var fileName = Guid.NewGuid().ToString() + Path.GetExtension(request.Image.FileName);
+                    var fileName =
+                        Guid.NewGuid().ToString() + Path.GetExtension(request.Image.FileName);
                     var filePath = Path.Combine(uploadsPath, fileName);
 
                     using (var fileStream = new FileStream(filePath, FileMode.Create))
@@ -244,14 +282,20 @@ namespace backend.Services
             }
         }
 
-
-        public async Task<bool> UpdateRewardWithImageAsync(Guid rewardId, UpdateReward updateDto, IFormFile? imageFile)
+        public async Task<bool> UpdateRewardWithImageAsync(
+            Guid rewardId,
+            UpdateReward updateDto,
+            IFormFile? imageFile
+        )
         {
-            var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
-                TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time"));
+            var now = TimeZoneInfo.ConvertTimeFromUtc(
+                DateTime.UtcNow,
+                TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time")
+            );
 
             var reward = await _context.Rewards.FindAsync(rewardId);
-            if (reward == null) return false;
+            if (reward == null)
+                return false;
 
             if (!string.IsNullOrEmpty(updateDto.RewardName))
                 reward.RewardName = updateDto.RewardName;
@@ -262,7 +306,10 @@ namespace backend.Services
             if (!string.IsNullOrEmpty(updateDto.Description))
                 reward.Description = updateDto.Description;
 
-            if (updateDto.StartDate.HasValue && updateDto.StartDate.Value >= new DateTime(1753, 1, 1))
+            if (
+                updateDto.StartDate.HasValue
+                && updateDto.StartDate.Value >= new DateTime(1753, 1, 1)
+            )
                 reward.StartDate = updateDto.StartDate.Value;
 
             if (updateDto.EndDate.HasValue && updateDto.EndDate.Value >= new DateTime(1753, 1, 1))
@@ -281,7 +328,6 @@ namespace backend.Services
                 reward.DiscountPercent = updateDto.DiscountPercent;
             if (!string.IsNullOrEmpty(updateDto.DiscountType))
                 reward.DiscountType = updateDto.DiscountType;
-
 
             reward.UpdateAt = now;
 
@@ -304,17 +350,16 @@ namespace backend.Services
             return true;
         }
 
-
         public async Task<PagedResult<Rewards>> GetAllRewardsAsync(
-    int page,
-    int pageSize,
-    string? search = null,
-    DateTime? startDate = null,
-    DateTime? endDate = null,
-    bool? isActive = null,
-    int? minPoints = null,
-    int? maxPoints = null
-)
+            int page,
+            int pageSize,
+            string? search = null,
+            DateTime? startDate = null,
+            DateTime? endDate = null,
+            bool? isActive = null,
+            int? minPoints = null,
+            int? maxPoints = null
+        )
         {
             var query = _context.Rewards.AsQueryable();
 
@@ -365,9 +410,10 @@ namespace backend.Services
                 Items = rewards,
                 TotalItems = totalItems,
                 Page = page,
-                PageSize = pageSize
+                PageSize = pageSize,
             };
         }
+
         public async Task<bool?> ToggleRewardIsActiveAsync(Guid rewardId)
         {
             var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
@@ -384,11 +430,11 @@ namespace backend.Services
             return reward.IsActive;
         }
 
-
         public async Task<Rewards?> GetRewardByIdAsync(Guid rewardId)
         {
             return await _context.Rewards.FirstOrDefaultAsync(r => r.RewardId == rewardId);
         }
+
         public async Task<Feeds> CreateFeedAsync(CreateFeedRequest request)
         {
             var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
@@ -402,7 +448,7 @@ namespace backend.Services
                 Content = request.Content,
                 CreatedAt = now,
                 IsActive = true,
-                ImageUrls = imageUrls.Select(url => new ImageUrl { Url = url }).ToList()
+                ImageUrls = imageUrls.Select(url => new ImageUrl { Url = url }).ToList(),
             };
 
             _context.Feeds.Add(feed);
@@ -415,11 +461,12 @@ namespace backend.Services
         {
             var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
             var now = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
-            var feed = await _context.Feeds
-                .Include(f => f.ImageUrls)
+            var feed = await _context
+                .Feeds.Include(f => f.ImageUrls)
                 .FirstOrDefaultAsync(f => f.FeedId == feedId);
 
-            if (feed == null) return null;
+            if (feed == null)
+                return null;
 
             // อัปเดตเฉพาะถ้ามีค่า (ไม่บังคับกรอก)
             if (!string.IsNullOrWhiteSpace(request.Title))
@@ -433,7 +480,9 @@ namespace backend.Services
             if (request.Images != null && request.Images.Any())
             {
                 var newUrls = await SaveImages(request.Images);
-                var newImages = newUrls.Select(url => new ImageUrl { Url = url, FeedId = feed.FeedId }).ToList();
+                var newImages = newUrls
+                    .Select(url => new ImageUrl { Url = url, FeedId = feed.FeedId })
+                    .ToList();
                 feed.ImageUrls.AddRange(newImages);
             }
 
@@ -444,7 +493,8 @@ namespace backend.Services
         public async Task<bool?> ToggleFeedIsActiveAsync(Guid feedId)
         {
             var feed = await _context.Feeds.FindAsync(feedId);
-            if (feed == null) return null;
+            if (feed == null)
+                return null;
 
             feed.IsActive = !feed.IsActive;
             feed.UpdatedAt = DateTime.UtcNow;
@@ -456,7 +506,8 @@ namespace backend.Services
         public async Task<bool> DeleteImageAsync(int imageId)
         {
             var image = await _context.ImageUrls.FindAsync(imageId);
-            if (image == null) return false;
+            if (image == null)
+                return false;
 
             _context.ImageUrls.Remove(image);
             await _context.SaveChangesAsync();
@@ -467,15 +518,18 @@ namespace backend.Services
         }
 
         public async Task<PagedResult<FeedDto>> GetFeedsPagedAsync(
-     int pageNumber = 1,
-     int pageSize = 10,
-     string? search = null,
-     bool? isActive = null,
-     DateTime? startDate = null,
-     DateTime? endDate = null)
+            int pageNumber = 1,
+            int pageSize = 10,
+            string? search = null,
+            bool? isActive = null,
+            DateTime? startDate = null,
+            DateTime? endDate = null
+        )
         {
-            if (pageNumber <= 0) pageNumber = 1;
-            if (pageSize <= 0) pageSize = 10;
+            if (pageNumber <= 0)
+                pageNumber = 1;
+            if (pageSize <= 0)
+                pageSize = 10;
 
             var query = _context.Feeds.Include(f => f.ImageUrls).AsQueryable();
 
@@ -502,65 +556,65 @@ namespace backend.Services
 
             var totalItems = await query.CountAsync();
 
-            var items = await query
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+            var items = await query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToListAsync();
 
             // ดึง FeedId ทั้งหมดที่ query ได้
             var feedIds = items.Select(f => f.FeedId).ToList();
 
             // นับจำนวน Like ที่ IsLike == true สำหรับ feed เหล่านี้
-            var likeCounts = await _context.FeedLikes
-                .Where(fl => feedIds.Contains(fl.FeedId) && fl.IsLike == true)
+            var likeCounts = await _context
+                .FeedLikes.Where(fl => feedIds.Contains(fl.FeedId) && fl.IsLike == true)
                 .GroupBy(fl => fl.FeedId)
                 .Select(g => new { FeedId = g.Key, Count = g.Count() })
                 .ToListAsync();
 
             // map entity ไป DTO พร้อมเพิ่ม LikeCount
-            var dtoItems = items.Select(f =>
-            {
-                var likeCount = likeCounts.FirstOrDefault(lc => lc.FeedId == f.FeedId)?.Count ?? 0;
-
-                return new FeedDto
+            var dtoItems = items
+                .Select(f =>
                 {
-                    FeedId = f.FeedId,
-                    Title = f.Title,
-                    Content = f.Content,
-                    ImageUrls = f.ImageUrls,
-                    CreatedAt = f.CreatedAt,
-                    UpdatedAt = f.UpdatedAt,
-                    IsActive = f.IsActive,
-                    LikeCount = likeCount
-                };
-            }).ToList();
+                    var likeCount =
+                        likeCounts.FirstOrDefault(lc => lc.FeedId == f.FeedId)?.Count ?? 0;
+
+                    return new FeedDto
+                    {
+                        FeedId = f.FeedId,
+                        Title = f.Title,
+                        Content = f.Content,
+                        ImageUrls = f.ImageUrls,
+                        CreatedAt = f.CreatedAt,
+                        UpdatedAt = f.UpdatedAt,
+                        IsActive = f.IsActive,
+                        LikeCount = likeCount,
+                    };
+                })
+                .ToList();
 
             return new PagedResult<FeedDto>
             {
                 Items = dtoItems,
                 TotalItems = totalItems,
                 Page = pageNumber,
-                PageSize = pageSize
+                PageSize = pageSize,
             };
         }
 
-
         public async Task<Feeds?> GetFeedByIdAsync(Guid id)
         {
-            return await _context.Feeds
-        .Include(f => f.ImageUrls)     // โหลด ImageUrls ด้วย
-        .FirstOrDefaultAsync(f => f.FeedId == id);
+            return await _context
+                .Feeds.Include(f => f.ImageUrls) // โหลด ImageUrls ด้วย
+                .FirstOrDefaultAsync(f => f.FeedId == id);
         }
+
         public async Task<PagedResult<AllTransaction>> GetAllTransactionsAsync(
-          int page,
-          int pageSize,
-          string? search,
-          string? transactionType,
-          string? rewardName,
-          string? phoneNumber,
-          DateTime? startDate,
-          DateTime? endDate
-      )
+            int page,
+            int pageSize,
+            string? search,
+            string? transactionType,
+            string? rewardName,
+            string? phoneNumber,
+            DateTime? startDate,
+            DateTime? endDate
+        )
         {
             var query = _context.PointTransactions.AsQueryable();
 
@@ -571,9 +625,8 @@ namespace backend.Services
             if (!string.IsNullOrEmpty(search))
             {
                 query = query.Where(t =>
-                    t.Description.Contains(search) ||
-                    t.RewardName.Contains(search));
-                    
+                    t.Description.Contains(search) || t.RewardName.Contains(search)
+                );
             }
 
             if (!string.IsNullOrEmpty(transactionType))
@@ -630,7 +683,7 @@ namespace backend.Services
                     OrderRef = t.OrderRef,
                     RemainPoint = t.RemainPoint,
                     ExpiredAt = t.ExpiredAt,
-                    BranchCode = t.BranchCode+"-"+t.OrderRef,
+                    BranchCode = t.BranchCode + "-" + t.OrderRef,
                 })
                 .ToListAsync();
 
@@ -639,7 +692,7 @@ namespace backend.Services
                 Items = items,
                 TotalItems = totalCount,
                 Page = page,
-                PageSize = pageSize
+                PageSize = pageSize,
             };
         }
 
@@ -733,7 +786,6 @@ namespace backend.Services
         //     };
         // }
 
-
         public async Task<DashboardSummaryDto> GetDashboardSummaryAsync()
         {
             var timeZone = TimeZoneInfo.FindSystemTimeZoneById("SE Asia Standard Time");
@@ -744,8 +796,10 @@ namespace backend.Services
 
             var cutoffDate = now.AddDays(-30);
 
-            var activeMembers = await _context.Users
-                .Where(u => u.LastTransactionDate.HasValue && u.LastTransactionDate.Value >= cutoffDate)
+            var activeMembers = await _context
+                .Users.Where(u =>
+                    u.LastTransactionDate.HasValue && u.LastTransactionDate.Value >= cutoffDate
+                )
                 .CountAsync();
 
             var inactiveMembers = totalMembers - activeMembers;
@@ -754,73 +808,78 @@ namespace backend.Services
             var totalRedeemedRewards = await _context.RedeemedRewards.CountAsync();
 
             // top 3 reward ที่ถูกแลก พร้อมชื่อรางวัล (join กับ Reward table)
-            var top3Rewards = await _context.RedeemedRewards
-                .GroupBy(r => r.RewardId)
-                .Select(g => new
-                {
-                    RewardId = g.Key,
-                    Count = g.Count()
-                })
+            var top3Rewards = await _context
+                .RedeemedRewards.GroupBy(r => r.RewardId)
+                .Select(g => new { RewardId = g.Key, Count = g.Count() })
                 .OrderByDescending(x => x.Count)
                 .Take(3)
-                .Join(_context.Rewards,
-                      rr => rr.RewardId,
-                      r => r.RewardId,
-                      (rr, r) => new RewardCountDto
-                      {
-                          RewardId = rr.RewardId,
-                          RewardName = r.RewardName,
-                          Count = rr.Count
-                      })
+                .Join(
+                    _context.Rewards,
+                    rr => rr.RewardId,
+                    r => r.RewardId,
+                    (rr, r) =>
+                        new RewardCountDto
+                        {
+                            RewardId = rr.RewardId,
+                            RewardName = r.RewardName,
+                            Count = rr.Count,
+                        }
+                )
                 .ToListAsync();
 
             // แต้ม earn และ redeem รวม
-            var totalEarnPoints = await _context.PointTransactions
-                .Where(t => t.TransactionType == "Earn")
-                .SumAsync(t => (int?)t.Points) ?? 0;
+            var totalEarnPoints =
+                await _context
+                    .PointTransactions.Where(t => t.TransactionType == "Earn")
+                    .SumAsync(t => (int?)t.Points) ?? 0;
 
-            var totalRedeemPoints = await _context.PointTransactions
-                .Where(t => t.TransactionType == "Redeem")
-                .SumAsync(t => (int?)t.Points) ?? 0;
+            var totalRedeemPoints =
+                await _context
+                    .PointTransactions.Where(t => t.TransactionType == "Redeem")
+                    .SumAsync(t => (int?)t.Points) ?? 0;
 
             // จำนวน like ทั้งหมดในระบบ (นับเฉพาะที่ IsLike == true)
-            var totalLikes = await _context.FeedLikes
-                .Where(fl => fl.IsLike == true)
-                .CountAsync();
+            var totalLikes = await _context.FeedLikes.Where(fl => fl.IsLike == true).CountAsync();
 
             // top 3 feed ที่ถูกกด like เยอะที่สุด
-            var top3Feeds = await _context.FeedLikes
-                .Where(fl => fl.IsLike == true)
+            var top3Feeds = await _context
+                .FeedLikes.Where(fl => fl.IsLike == true)
                 .GroupBy(fl => fl.FeedId)
-                .Select(g => new
-                {
-                    FeedId = g.Key,
-                    LikeCount = g.Count()
-                })
+                .Select(g => new { FeedId = g.Key, LikeCount = g.Count() })
                 .OrderByDescending(x => x.LikeCount)
                 .Take(3)
-                .Join(_context.Feeds,
-                      fl => fl.FeedId,
-                      f => f.FeedId,
-                      (fl, f) => new FeedLikeCountDto
-                      {
-                          FeedId = fl.FeedId,
-                          Title = f.Title,
-                          LikeCount = fl.LikeCount
-                      })
+                .Join(
+                    _context.Feeds,
+                    fl => fl.FeedId,
+                    f => f.FeedId,
+                    (fl, f) =>
+                        new FeedLikeCountDto
+                        {
+                            FeedId = fl.FeedId,
+                            Title = f.Title,
+                            LikeCount = fl.LikeCount,
+                        }
+                )
                 .ToListAsync();
 
             // นับเพศ
             var maleCount = await _context.Users.CountAsync(u => u.Gender == "Male");
             var femaleCount = await _context.Users.CountAsync(u => u.Gender == "Female");
-            var otherCount = await _context.Users.CountAsync(u => u.Gender != "Male" && u.Gender != "Female");
+            var otherCount = await _context.Users.CountAsync(u =>
+                u.Gender != "Male" && u.Gender != "Female"
+            );
             // คำนวณอายุ: เฉลี่ย, น้อยสุด, มากสุด (เฉพาะที่มีวันเกิด)
-            var ageStats = await _context.Users
-                .Where(u => u.BirthDate.HasValue)
+            var ageStats = await _context
+                .Users.Where(u => u.BirthDate.HasValue)
                 .Select(u => new
                 {
-                    Age = now.Year - u.BirthDate.Value.Year -
-                          (now < u.BirthDate.Value.AddYears(now.Year - u.BirthDate.Value.Year) ? 1 : 0)
+                    Age = now.Year
+                        - u.BirthDate.Value.Year
+                        - (
+                            now < u.BirthDate.Value.AddYears(now.Year - u.BirthDate.Value.Year)
+                                ? 1
+                                : 0
+                        ),
                 })
                 .Where(a => a.Age > 10)
                 .ToListAsync();
@@ -829,18 +888,17 @@ namespace backend.Services
             var maxAge = ageStats.Any() ? ageStats.Max(a => a.Age) : 0;
             var avgAge = ageStats.Any() ? (int)Math.Round(ageStats.Average(a => a.Age)) : 0;
 
-
             // เพิ่มข้อมูลสมาชิกใหม่รายเดือนย้อนหลัง 12 เดือน (รวมเดือนปัจจุบัน)
             var startDate = new DateTime(now.Year, now.Month, 1).AddMonths(-11);
 
-            var monthlyNewUsersRaw = await _context.Users
-                .Where(u => u.CreatedAt >= startDate)
+            var monthlyNewUsersRaw = await _context
+                .Users.Where(u => u.CreatedAt >= startDate)
                 .GroupBy(u => new { u.CreatedAt.Year, u.CreatedAt.Month })
                 .Select(g => new MonthlyNewUserDto
                 {
                     Year = g.Key.Year,
                     Month = g.Key.Month,
-                    Count = g.Count()
+                    Count = g.Count(),
                 })
                 .ToListAsync();
 
@@ -848,14 +906,18 @@ namespace backend.Services
             for (int i = 0; i < 12; i++)
             {
                 var targetDate = startDate.AddMonths(i);
-                var record = monthlyNewUsersRaw.FirstOrDefault(x => x.Year == targetDate.Year && x.Month == targetDate.Month);
+                var record = monthlyNewUsersRaw.FirstOrDefault(x =>
+                    x.Year == targetDate.Year && x.Month == targetDate.Month
+                );
 
-                monthlyNewUsers.Add(new MonthlyNewUserDto
-                {
-                    Year = targetDate.Year,
-                    Month = targetDate.Month,
-                    Count = record?.Count ?? 0
-                });
+                monthlyNewUsers.Add(
+                    new MonthlyNewUserDto
+                    {
+                        Year = targetDate.Year,
+                        Month = targetDate.Month,
+                        Count = record?.Count ?? 0,
+                    }
+                );
             }
 
             return new DashboardSummaryDto
@@ -867,32 +929,29 @@ namespace backend.Services
                     Inactive = inactiveMembers,
                     MinAge = minAge,
                     MaxAge = maxAge,
-                    AverageAge = avgAge
+                    AverageAge = avgAge,
                 },
                 GenderSummary = new GenderSummaryDto
                 {
                     Male = maleCount,
                     Female = femaleCount,
-                    Other = otherCount
+                    Other = otherCount,
                 },
                 Rewards = new RewardSummaryDto
                 {
                     TotalRedeemed = totalRedeemedRewards,
-                    Top3Redeemed = top3Rewards
+                    Top3Redeemed = top3Rewards,
                 },
                 Points = new PointSummaryDto
                 {
                     Earned = totalEarnPoints,
-                    Redeemed = totalRedeemPoints
+                    Redeemed = totalRedeemPoints,
                 },
-                Likes = new LikeSummaryDto
-                {
-                    TotalLikes = totalLikes,
-                    Top3LikedFeeds = top3Feeds
-                },
-                MonthlyNewUsers = monthlyNewUsers  // ส่งข้อมูลรายเดือน
+                Likes = new LikeSummaryDto { TotalLikes = totalLikes, Top3LikedFeeds = top3Feeds },
+                MonthlyNewUsers = monthlyNewUsers, // ส่งข้อมูลรายเดือน
             };
         }
+
         public async Task<Category> CreateCategoryAsync(CreateCategoryRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Name))
@@ -911,11 +970,11 @@ namespace backend.Services
             return category;
         }
 
-
         public async Task<AdminLoginResponse> LoginAsync(AdminLoginRequest request)
         {
-            var user = await _context.User_Admin
-                .FirstOrDefaultAsync(u => u.Username == request.Username);
+            var user = await _context.User_Admin.FirstOrDefaultAsync(u =>
+                u.Username == request.Username
+            );
 
             if (user == null)
                 throw new UnauthorizedAccessException("ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง");
@@ -930,13 +989,21 @@ namespace backend.Services
                 Token = token,
                 UserId = user.UserId,
                 Username = user.Username,
-                FullName = user.Name
+                FullName = user.Name,
             };
         }
-        public async Task<UserRedeemResultDto> GetUsersByRewardAsync(Guid rewardId, int page, int pageSize, string? phoneNumber, bool? isUsed = null, string? couponCode = null)
+
+        public async Task<UserRedeemResultDto> GetUsersByRewardAsync(
+            Guid rewardId,
+            int page,
+            int pageSize,
+            string? phoneNumber,
+            bool? isUsed = null,
+            string? couponCode = null
+        )
         {
-            var query = _context.RedeemedRewards
-                .Where(r => r.RewardId == rewardId)
+            var query = _context
+                .RedeemedRewards.Where(r => r.RewardId == rewardId)
                 .Include(r => r.User)
                 .AsQueryable();
 
@@ -980,16 +1047,17 @@ namespace backend.Services
                     Items = items,
                     TotalItems = totalCount,
                     Page = page,
-                    PageSize = pageSize
+                    PageSize = pageSize,
                 },
-                UsedCount = usedCount
+                UsedCount = usedCount,
             };
         }
 
         public async Task<bool> RevertCouponUsageAsync(string couponCode)
         {
-            var rr = await _context.RedeemedRewards
-                .FirstOrDefaultAsync(r => r.CouponCode == couponCode && r.IsUsed);
+            var rr = await _context.RedeemedRewards.FirstOrDefaultAsync(r =>
+                r.CouponCode == couponCode && r.IsUsed
+            );
 
             if (rr == null)
                 return false;
@@ -1004,8 +1072,5 @@ namespace backend.Services
 
             return true;
         }
-
-
     }
 }
-

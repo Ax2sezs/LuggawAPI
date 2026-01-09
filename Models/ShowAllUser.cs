@@ -12,6 +12,7 @@
         public string? Gender { get; set; } // "male" / "female" / "other"
         public int? Point { get; set; }
         public bool? IsActive { get; set; }
+        public bool? IsAllow { get; set; }
     }
     public class PagedResult<T>
     {
