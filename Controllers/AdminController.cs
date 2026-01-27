@@ -148,7 +148,7 @@ namespace backend.Controllers
             return Ok(categories);
         }
 
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "SuperAdmin")]
         [HttpGet("generate-code")]
         public async Task<IActionResult> GenerateCode([FromQuery] string prefix)
         {
