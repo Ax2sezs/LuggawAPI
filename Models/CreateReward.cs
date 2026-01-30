@@ -17,6 +17,7 @@ namespace backend.Models
         public string DiscountMin { get; set; }
         public string DiscountPercent { get; set; }
         public string DiscountType { get; set; }
+        public string? RewardCode { get; set; }
 
     }
 }

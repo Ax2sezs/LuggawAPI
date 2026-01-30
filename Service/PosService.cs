@@ -64,7 +64,7 @@ public class PosService : IPosService
                     rw_reward_id = 0,
                     rw_reward_guid = rr.Reward.RewardId,
                     rw_rewardcode = rr.Reward.CouponCode,
-                    rewards_channel_code = "",
+                    rewards_channel_code = rr.Reward.RewardCode,
                     rewards_name_th = rr.Reward.RewardName,
                     rewards_start = rr.Reward.StartDate,
                     rewards_end = rr.Reward.EndDate,

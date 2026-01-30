@@ -250,6 +250,7 @@ namespace backend.Services
                     DiscountMin = request.DiscountMin,
                     DiscountPercent = request.DiscountPercent,
                     DiscountType = request.DiscountType,
+                    RewardCode = request.RewardCode,
                 };
 
                 if (request.Image != null && request.Image.Length > 0)
@@ -328,6 +329,8 @@ namespace backend.Services
                 reward.DiscountPercent = updateDto.DiscountPercent;
             if (!string.IsNullOrEmpty(updateDto.DiscountType))
                 reward.DiscountType = updateDto.DiscountType;
+            if (!string.IsNullOrEmpty(updateDto.RewardCode))
+                reward.RewardCode = updateDto.RewardCode;
 
             reward.UpdateAt = now;
 
