@@ -3,8 +3,10 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using backend.DTOs;
 using backend.Models;
 using backend.Service.Interfaces;
+using ClosedXML.Excel;
 using LineLoginBackend.Data;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -251,6 +253,7 @@ namespace backend.Services
                     DiscountPercent = request.DiscountPercent,
                     DiscountType = request.DiscountType,
                     RewardCode = request.RewardCode,
+                    ValidDays = request.ValidDays,
                 };
 
                 if (request.Image != null && request.Image.Length > 0)
@@ -331,6 +334,8 @@ namespace backend.Services
                 reward.DiscountType = updateDto.DiscountType;
             if (!string.IsNullOrEmpty(updateDto.RewardCode))
                 reward.RewardCode = updateDto.RewardCode;
+            if (updateDto.ValidDays.HasValue)
+                reward.ValidDays = updateDto.ValidDays;
 
             reward.UpdateAt = now;
 
@@ -437,6 +442,7 @@ namespace backend.Services
         {
             return await _context.Rewards.FirstOrDefaultAsync(r => r.RewardId == rewardId);
         }
+
 
         public async Task<Feeds> CreateFeedAsync(CreateFeedRequest request)
         {
@@ -1054,6 +1060,78 @@ namespace backend.Services
                 },
                 UsedCount = usedCount,
             };
+        }
+        public async Task<byte[]> ExportRedeemedUsersAsync(
+            DateTime startDate,
+            DateTime endDate
+        )
+        {
+            var end = endDate.Date.AddDays(1).AddTicks(-1);
+
+            var data = await _context.RedeemedRewards
+                .AsNoTracking()
+                .Include(r => r.User)
+                .Where(r =>
+                    r.RedeemedDate >= startDate &&
+                    r.RedeemedDate <= end
+                )
+                .OrderByDescending(r => r.RedeemedDate)
+                .Select(r => new RedeemExportDto
+                {
+                    FirstName = r.User.FirstName,
+                    LastName = r.User.LastName,
+                    PhoneNumber = r.User.PhoneNumber,
+                    RewardName = r.Reward.RewardName,
+                    RewardCode = r.Reward.CouponCode,
+                    CouponCode = r.CouponCode,
+                    RedeemedDate = r.RedeemedDate,
+                    ExpiredDate = r.ExpiredAt,
+                    IsUsed = r.IsUsed,
+                    UsedDate = r.UsedDate,
+                    UsedAt = r.UsedAt
+                })
+                .ToListAsync();
+
+            using var workbook = new XLWorkbook();
+            var ws = workbook.Worksheets.Add("RedeemedRewards");
+
+            // Header
+            ws.Cell(1, 1).Value = "First Name";
+            ws.Cell(1, 2).Value = "Last Name";
+            ws.Cell(1, 3).Value = "Phone";
+            ws.Cell(1, 4).Value = "Reward Name";
+            ws.Cell(1, 5).Value = "Reward Code";
+            ws.Cell(1, 6).Value = "Coupon Code";
+            ws.Cell(1, 7).Value = "Quantity";
+            ws.Cell(1, 8).Value = "Redeemed Date";
+            ws.Cell(1, 9).Value = "Expired Date";
+            ws.Cell(1, 10).Value = "Is Used";
+            ws.Cell(1, 11).Value = "Used Date";
+            ws.Cell(1, 12).Value = "Used At";
+
+            var row = 2;
+            foreach (var item in data)
+            {
+                ws.Cell(row, 1).Value = item.FirstName;
+                ws.Cell(row, 2).Value = item.LastName;
+                ws.Cell(row, 3).Value = item.PhoneNumber;
+                ws.Cell(row, 4).Value = item.RewardName;
+                ws.Cell(row, 5).Value = item.RewardCode;
+                ws.Cell(row, 6).Value = item.CouponCode;
+                ws.Cell(row, 7).Value = "1";
+                ws.Cell(row, 8).Value = item.RedeemedDate;
+                ws.Cell(row, 9).Value = item.ExpiredDate;
+                ws.Cell(row, 10).Value = item.IsUsed ? "Used" : "Not Used";
+                ws.Cell(row, 11).Value = item.UsedDate;
+                ws.Cell(row, 12).Value = item.UsedAt;
+                row++;
+            }
+
+            ws.Columns().AdjustToContents();
+
+            using var stream = new MemoryStream();
+            workbook.SaveAs(stream);
+            return stream.ToArray();
         }
 
         public async Task<bool> RevertCouponUsageAsync(string couponCode)

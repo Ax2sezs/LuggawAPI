@@ -11,7 +11,7 @@ namespace backend.Service.Interfaces
                 bool? isActive = null,
                 DateTime? createdAfter = null,
                 DateTime? createdBefore = null
-            ); 
+            );
         Task ToggleUserStatusAsync(ToggleRequest request);
         Task ToggleUserPolicyAsync(Guid userId);
         Task CreateRewardAsync(CreateRewardRequest request);
@@ -61,6 +61,11 @@ namespace backend.Service.Interfaces
         Task<AdminLoginResponse> LoginAsync(AdminLoginRequest request);
         Task<UserRedeemResultDto> GetUsersByRewardAsync(Guid rewardId, int page, int pageSize, string? phoneNumber, bool? isUsed = null, string? couponCode = null);
         Task<bool> RevertCouponUsageAsync(string couponCode);
+        Task<byte[]> ExportRedeemedUsersAsync(
+        DateTime startDate,
+        DateTime endDate
+    );
+
 
 
 
