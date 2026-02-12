@@ -11,6 +11,7 @@
         public string? RewardStatus { get; set; }
         public string? RewardComment { get; set; }
         public DateTime? UsedDate { get; set; }
+        public DateTime? ExpiredAt { get; set; }
         public string CouponCode { get; set; }
         public virtual User User { get; set; }
 

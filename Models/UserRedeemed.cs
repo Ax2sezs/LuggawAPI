@@ -11,6 +11,7 @@
         public int PointsRequired { get; set; }
         public DateTime? StartDate { get; set; }
         public DateTime? EndDate { get; set; }
+        public DateTime? ExpiredAt { get; set; }
         public string CouponCode { get; set; }
         public bool IsUsed { get; set; }
         public DateTime? UsedDate { get; set; }

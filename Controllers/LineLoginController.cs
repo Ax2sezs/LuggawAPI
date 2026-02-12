@@ -444,6 +444,7 @@ namespace LineLoginBackend.Controllers
             user.BirthDate = request.BirthDate;
             user.Gender = request.Gender;
             user.IsCompleted = true;
+            user.IsAllow = true;
 
             var existingUserPoints = await _dbContext.UserPoints.FirstOrDefaultAsync(up => up.UserId == userId);
             if (existingUserPoints == null)

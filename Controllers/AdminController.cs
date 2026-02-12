@@ -38,7 +38,7 @@ namespace backend.Controllers
             }
         }
 
-        [Authorize(Roles = "Admin,SuperAdmin")]
+        [Authorize(Roles = "Admin,SuperAdmin,Viewer")]
         [HttpGet("summary")]
         public async Task<IActionResult> GetSummary()
         {
@@ -251,6 +251,32 @@ namespace backend.Controllers
             return Ok(reward);
         }
 
+        [Authorize(Roles = "SuperAdmin,Viewer")]
+        [HttpGet("export")]
+        public async Task<IActionResult> ExportRedeemedUsers(
+        [FromQuery] DateTime startDate,
+        [FromQuery] DateTime endDate
+    )
+        {
+            if (startDate > endDate)
+            {
+                return BadRequest("startDate must be less than or equal to endDate");
+            }
+
+            var fileBytes = await _adminService.ExportRedeemedUsersAsync(startDate, endDate);
+
+            var fileName = $"redeemed_{startDate:yyyyMMdd}_{endDate:yyyyMMdd}.xlsx";
+
+            return File(
+                fileBytes,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                fileName
+            );
+        }
+
+
+
+
         [Authorize(Roles = "Admin")]
         [HttpPost("create-feed")]
         public async Task<IActionResult> CreateFeed([FromForm] CreateFeedRequest request)
@@ -345,6 +371,34 @@ namespace backend.Controllers
             );
             return Ok(result);
         }
+
+        [Authorize(Roles = "SuperAdmin,Viewer")]
+        [HttpGet("reward/transaction")]
+        public async Task<ActionResult<RedeemTransactionResultDto>> GetRewardTransaction(
+     int page = 1,
+     int pageSize = 20,
+     string? phoneNumber = null,
+     bool? isUsed = null,
+     string? couponCode = null,
+     string? rewardName = null,
+     DateTime? startDate = null,
+     DateTime? endDate = null
+ )
+        {
+            var result = await _adminService.GetRewardTransactionsAsync(
+                page,
+                pageSize,
+                phoneNumber,
+                isUsed,
+                couponCode,
+                rewardName,
+                startDate,
+                endDate
+            );
+
+            return Ok(result);
+        }
+
 
         [Authorize(Roles = "SuperAdmin")]
         [HttpPatch("coupon/revert/{couponCode}")]

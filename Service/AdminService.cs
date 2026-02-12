@@ -1061,6 +1061,94 @@ namespace backend.Services
                 UsedCount = usedCount,
             };
         }
+
+        public async Task<RedeemTransactionResultDto> GetRewardTransactionsAsync(
+    int page,
+    int pageSize,
+    string? phoneNumber,
+    bool? isUsed = null,
+    string? couponCode = null,
+    string? rewardName = null,
+DateTime? startDate = null,
+DateTime? endDate = null
+
+)
+        {
+            var query = _context.RedeemedRewards
+                .Include(r => r.User)
+                .Include(r => r.Reward) // ต้องมี navigation property
+                .AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(phoneNumber))
+            {
+                query = query.Where(r => r.User.PhoneNumber.Contains(phoneNumber));
+            }
+
+            if (!string.IsNullOrWhiteSpace(couponCode))
+            {
+                query = query.Where(r => r.CouponCode.Contains(couponCode));
+            }
+
+            if (isUsed.HasValue)
+            {
+                query = query.Where(r => r.IsUsed == isUsed.Value);
+            }
+            if (!string.IsNullOrWhiteSpace(rewardName))
+            {
+                query = query.Where(r => r.Reward.RewardName.Contains(rewardName));
+            }
+            if (startDate.HasValue)
+            {
+                query = query.Where(r => r.RedeemedDate >= startDate.Value);
+            }
+
+            if (endDate.HasValue)
+            {
+                var end = endDate.Value.Date.AddDays(1);
+                query = query.Where(r => r.RedeemedDate < end);
+            }
+
+            var totalCount = await query.CountAsync();
+            var usedCount = await query.CountAsync(r => r.IsUsed);
+
+            var items = await query
+                .OrderByDescending(r => r.RedeemedDate)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(r => new RedeemTransactionDto
+                {
+                    UserId = r.UserId,
+                    FirstName = r.User.FirstName,
+                    LastName = r.User.LastName,
+                    PhoneNumber = r.User.PhoneNumber,
+
+                    RewardId = r.RewardId,
+                    RewardName = r.Reward.RewardName,   // เพิ่มชื่อ reward
+                    RewardCode = r.Reward.CouponCode,
+                    PointUsed = r.Reward.PointsRequired,      // ถ้ามี field นี้
+
+                    RedeemedDate = r.RedeemedDate,
+                    ExpiredDate = r.ExpiredAt,
+                    Status = r.IsUsed ? "Used" : "Unused",
+                    UsedDate = r.UsedDate,
+                    CouponCode = r.CouponCode,
+                    UsedAt = r.UsedAt,
+                })
+                .ToListAsync();
+
+            return new RedeemTransactionResultDto
+            {
+                Paged = new PagedResult<RedeemTransactionDto>
+                {
+                    Items = items,
+                    TotalItems = totalCount,
+                    Page = page,
+                    PageSize = pageSize,
+                },
+                UsedCount = usedCount,
+            };
+        }
+
         public async Task<byte[]> ExportRedeemedUsersAsync(
             DateTime startDate,
             DateTime endDate

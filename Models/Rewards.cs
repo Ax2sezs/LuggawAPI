@@ -30,6 +30,7 @@ namespace backend.Models
         public string DiscountPercent { get; set; }
         public string DiscountType { get; set; }
         public string? RewardCode { get; set; }
+        public int? ValidDays { get; set; } 
 
         // ✅ Navigation Property
         [ForeignKey("CategoryId")]

@@ -61,6 +61,7 @@ namespace backend.Service.Interfaces
         Task<AdminLoginResponse> LoginAsync(AdminLoginRequest request);
         Task<UserRedeemResultDto> GetUsersByRewardAsync(Guid rewardId, int page, int pageSize, string? phoneNumber, bool? isUsed = null, string? couponCode = null);
         Task<bool> RevertCouponUsageAsync(string couponCode);
+        Task<RedeemTransactionResultDto> GetRewardTransactionsAsync(int page, int pageSize, string? phoneNumber, bool? isUsed = null, string? couponCode = null, string? rewardName =null , DateTime? startDate = null, DateTime? endDate = null );
         Task<byte[]> ExportRedeemedUsersAsync(
         DateTime startDate,
         DateTime endDate
