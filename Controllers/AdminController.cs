@@ -380,9 +380,11 @@ namespace backend.Controllers
      string? phoneNumber = null,
      bool? isUsed = null,
      string? couponCode = null,
-     string? rewardName = null,
-     DateTime? startDate = null,
-     DateTime? endDate = null
+     string? rewardCode = null,
+     DateTime? startRedeemDate = null,
+     DateTime? endRedeemDate = null,
+     DateTime? startUsedDate = null,
+     DateTime? endUsedDate = null
  )
         {
             var result = await _adminService.GetRewardTransactionsAsync(
@@ -391,9 +393,11 @@ namespace backend.Controllers
                 phoneNumber,
                 isUsed,
                 couponCode,
-                rewardName,
-                startDate,
-                endDate
+                rewardCode,
+                startRedeemDate,
+                endRedeemDate,
+                startUsedDate,
+                endUsedDate
             );
 
             return Ok(result);

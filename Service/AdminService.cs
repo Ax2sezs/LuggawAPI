@@ -1068,9 +1068,11 @@ namespace backend.Services
     string? phoneNumber,
     bool? isUsed = null,
     string? couponCode = null,
-    string? rewardName = null,
-DateTime? startDate = null,
-DateTime? endDate = null
+    string? rewardCode = null,
+DateTime? startRedeemDate = null,
+DateTime? endRedeemDate = null,
+DateTime? startUsedDate = null,
+DateTime? endUsedDate = null
 
 )
         {
@@ -1093,19 +1095,30 @@ DateTime? endDate = null
             {
                 query = query.Where(r => r.IsUsed == isUsed.Value);
             }
-            if (!string.IsNullOrWhiteSpace(rewardName))
+            if (!string.IsNullOrWhiteSpace(rewardCode))
             {
-                query = query.Where(r => r.Reward.RewardName.Contains(rewardName));
+                query = query.Where(r => r.Reward.CouponCode.Contains(rewardCode));
             }
-            if (startDate.HasValue)
+            if (startRedeemDate.HasValue)
             {
-                query = query.Where(r => r.RedeemedDate >= startDate.Value);
+                query = query.Where(r => r.RedeemedDate >= startRedeemDate.Value);
             }
 
-            if (endDate.HasValue)
+            if (endRedeemDate.HasValue)
             {
-                var end = endDate.Value.Date.AddDays(1);
+                var end = endRedeemDate.Value.Date.AddDays(1);
                 query = query.Where(r => r.RedeemedDate < end);
+            }
+
+            if (startUsedDate.HasValue)
+            {
+                query = query.Where(r => r.UsedDate >= startUsedDate.Value);
+            }
+
+            if (endUsedDate.HasValue)
+            {
+                var end = endUsedDate.Value.Date.AddDays(1);
+                query = query.Where(r => r.UsedDate < end);
             }
 
             var totalCount = await query.CountAsync();
